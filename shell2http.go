@@ -6,7 +6,12 @@ Install:
 	ln -s $GOPATH/bin/shell2http ~/bin/shell2http
 
 Usage:
-	shell2http /path "shell command" /path2 "shell command2" ...
+	shell2http [options] /path "shell command" /path2 "shell command2" ...
+	options:
+		-host="host": host for http server
+		-host=      : for bind to all host
+		-port=NNNN  : port for http server
+		-help
 
 Examples:
 	shell2http /top "top -l 1 | head -10"
@@ -22,6 +27,7 @@ Update:
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,7 +35,10 @@ import (
 )
 
 // default port for http-server
-const PORT = "8080"
+const PORT = 8080
+
+// default host for bind
+const HOST = "localhost"
 
 // ------------------------------------------------------------------
 const INDEX_HTML = `
@@ -56,26 +65,35 @@ type t_command struct {
 }
 
 // ------------------------------------------------------------------
-// parse argeuments
-func get_handlers() ([]t_command, error) {
-	// need >= 2 argeuments and count of it must be even
-	if len(os.Args) < 3 || len(os.Args)%2 == 0 {
-		return nil, fmt.Errorf(`usage: shell2http /path "shell command" /path2 "shell command2"`)
+// parse arguments
+func get_config() (cmd_handlers []t_command, host string, port int, err error) {
+	flag.IntVar(&port, "port", PORT, "port for http server")
+	flag.StringVar(&host, "host", HOST, "host for http server")
+	usage_str := fmt.Sprintf(`usage: %s [options] /path "shell command" /path2 "shell command2"`, os.Args[0])
+	flag.Usage = func() {
+		fmt.Println(usage_str)
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+	flag.Parse()
+
+	// need >= 2 arguments and count of it must be even
+	args := flag.Args()
+	if len(args) < 2 || len(args)%2 == 1 {
+		return nil, host, port, fmt.Errorf(usage_str)
 	}
 
-	cmd_handlers := []t_command{}
-
-	args_i := 1
-	for args_i < len(os.Args) {
-		path, cmd := os.Args[args_i], os.Args[args_i+1]
+	args_i := 0
+	for args_i < len(args) {
+		path, cmd := args[args_i], args[args_i+1]
 		if path[0] != '/' {
-			return nil, fmt.Errorf("error: path %s dont starts with /", path)
+			return nil, host, port, fmt.Errorf("error: path %s dont starts with /", path)
 		}
 		cmd_handlers = append(cmd_handlers, t_command{path: path, cmd: cmd})
 		args_i += 2
 	}
 
-	return cmd_handlers, nil
+	return cmd_handlers, host, port, nil
 }
 
 // ------------------------------------------------------------------
@@ -124,15 +142,16 @@ func setup_handlers(cmd_handlers []t_command) {
 
 // ------------------------------------------------------------------
 func main() {
-	cmd_handlers, err := get_handlers()
+	cmd_handlers, host, port, err := get_config()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	setup_handlers(cmd_handlers)
 
-	fmt.Println("listen http://localhost:" + PORT + "/")
-	err = http.ListenAndServe(":"+PORT, nil)
+	adress := fmt.Sprintf("%s:%d", host, port)
+	fmt.Printf("listen http://%s/\n", adress)
+	err = http.ListenAndServe(adress, nil)
 	if err != nil {
 		fmt.Println(err)
 		return

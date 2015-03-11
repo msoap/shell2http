@@ -3,7 +3,7 @@ shell2http
 
 Execute shell commands via simple http server (written in Go language).
 Settings through 2 command line arguments, path and shell command.
-Uses 8080 port.
+By default bind to localhost:8080.
 
 Install:
 
@@ -14,7 +14,12 @@ Install:
 
 Usage:
 
-    shell2http /path "shell command" /path2 "shell command2" ...
+    shell2http [options] /path "shell command" /path2 "shell command2" ...
+    options:
+        -host="host": host for http server
+        -host=      : for bind to all host
+        -port=NNNN  : port for http server
+        -help
 
 Examples:
 
