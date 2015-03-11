@@ -9,7 +9,7 @@ Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
 		-host="host": host for http server
-		-host=      : for bind to all host
+		-host=      : for bind to all hosts
 		-port=NNNN  : port for http server
 		-help
 
