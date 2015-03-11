@@ -80,7 +80,7 @@ func get_handlers() ([]t_command, error) {
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setup_handlers(cmd_handlers []t_command, the_end chan interface{}) {
+func setup_handlers(cmd_handlers []t_command) {
 	index_li_html := ""
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
@@ -116,7 +116,7 @@ func setup_handlers(cmd_handlers []t_command, the_end chan interface{}) {
 	http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
 		fmt.Println("GET /exit")
 		fmt.Fprint(rw, "Bye...")
-		the_end <- nil
+		go os.Exit(0)
 
 		return
 	})
@@ -129,10 +129,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	the_end := make(chan interface{})
-	setup_handlers(cmd_handlers, the_end)
+	setup_handlers(cmd_handlers)
 
 	fmt.Println("listen http://localhost:" + PORT + "/")
-	go http.ListenAndServe(":"+PORT, nil)
-	<-the_end // wait for exit command
+	err = http.ListenAndServe(":"+PORT, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
