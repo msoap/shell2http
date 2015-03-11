@@ -22,7 +22,6 @@ Update:
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -61,7 +60,7 @@ type t_command struct {
 func get_handlers() ([]t_command, error) {
 	// need >= 2 argeuments and count of it must be even
 	if len(os.Args) < 3 || len(os.Args)%2 == 0 {
-		return nil, errors.New(`Usage: shell2http /path "shell command" /path2 "shell command2" ...`)
+		return nil, fmt.Errorf(`Usage: shell2http /path "shell command" /path2 "shell command2" ...`)
 	}
 
 	cmd_handlers := []t_command{}
@@ -70,7 +69,7 @@ func get_handlers() ([]t_command, error) {
 	for args_i < len(os.Args) {
 		path, cmd := os.Args[args_i], os.Args[args_i+1]
 		if path[0] != '/' {
-			return nil, errors.New(fmt.Sprintf("Error: path %s dont starts with /", path))
+			return nil, fmt.Errorf("Error: path %s dont starts with /", path)
 		}
 		cmd_handlers = append(cmd_handlers, t_command{path: path, cmd: cmd})
 		args_i += 2
