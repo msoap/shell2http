@@ -6,6 +6,7 @@ Settings through 2 command line arguments, path and shell command.
 By default bind to localhost:8080.
 
 Install:
+--------
 
     # install Go (brew install go ...)
     # set $GOPATH if needed
@@ -13,6 +14,7 @@ Install:
     ln -s $GOPATH/bin/shell2http ~/bin/shell2http
 
 Usage:
+------
 
     shell2http [options] /path "shell command" /path2 "shell command2" ...
     options:
@@ -22,6 +24,7 @@ Usage:
         -help
 
 Examples:
+---------
 
     shell2http /top "top -l 1 | head -10"
     shell2http /date date /ps "ps aux"
@@ -30,5 +33,11 @@ Examples:
     shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 
 Update:
+-------
 
     go get -u github.com/msoap/shell2http
+
+See also:
+---------
+
+ * Emergency web server - [spark](https://github.com/rif/spark)
