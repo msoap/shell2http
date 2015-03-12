@@ -29,6 +29,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
@@ -46,14 +47,15 @@ const INDEX_HTML = `
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Index shell commands</title>
+	<title>shell2http</title>
 </head>
 <body>
-	<h1>Index shell commands</h1>
+	<h1>shell2http</h1>
 	<ul>
 		%s
 		<li><a href="/exit">/exit</a></li>
 	</ul>
+	Get from: <a href="https://github.com/msoap/shell2http">github.com/msoap/shell2http</a>
 </body>
 </html>
 `
@@ -118,7 +120,7 @@ func setup_handlers(cmd_handlers []t_command) {
 
 		log.Printf("register: %s (%s)\n", path, cmd)
 		http.HandleFunc(path, shell_handler)
-		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, path, path)
+		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
 	}
 
 	// --------------
