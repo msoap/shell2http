@@ -8,9 +8,10 @@ Install:
 Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
-		-host="host": host for http server
-		-host=      : for bind to all hosts
-		-port=NNNN  : port for http server
+		-host="host" : host for http server
+		-host=       : for bind to all hosts
+		-port=NNNN   : port for http server
+		-log=filename: log filename, default - STDOUT
 		-help
 
 Examples:
@@ -70,6 +71,8 @@ type t_command struct {
 // ------------------------------------------------------------------
 // parse arguments
 func get_config() (cmd_handlers []t_command, host string, port int, err error) {
+	var log_filename string
+	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&port, "port", PORT, "port for http server")
 	flag.StringVar(&host, "host", HOST, "host for http server")
 	flag.Usage = func() {
@@ -78,6 +81,15 @@ func get_config() (cmd_handlers []t_command, host string, port int, err error) {
 		os.Exit(0)
 	}
 	flag.Parse()
+
+	// setup log file
+	if len(log_filename) > 0 {
+		fh_log, err := os.OpenFile(log_filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatalf("error opening log file: %v", err)
+		}
+		log.SetOutput(fh_log)
+	}
 
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
