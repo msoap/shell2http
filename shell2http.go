@@ -29,6 +29,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -69,9 +70,8 @@ type t_command struct {
 func get_config() (cmd_handlers []t_command, host string, port int, err error) {
 	flag.IntVar(&port, "port", PORT, "port for http server")
 	flag.StringVar(&host, "host", HOST, "host for http server")
-	usage_str := fmt.Sprintf(`usage: %s [options] /path "shell command" /path2 "shell command2"`, os.Args[0])
 	flag.Usage = func() {
-		fmt.Println(usage_str)
+		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
@@ -80,7 +80,7 @@ func get_config() (cmd_handlers []t_command, host string, port int, err error) {
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
 	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, host, port, fmt.Errorf(usage_str)
+		return nil, host, port, fmt.Errorf("error: need pairs of path and shell command")
 	}
 
 	args_i := 0
@@ -103,11 +103,11 @@ func setup_handlers(cmd_handlers []t_command) {
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
-			fmt.Println("GET", path)
+			log.Println("GET", path)
 
 			shell_out, err := exec.Command("sh", "-c", cmd).Output()
 			if err != nil {
-				fmt.Println("exec error: ", err)
+				log.Println("exec error: ", err)
 				fmt.Fprint(rw, "exec error: ", err)
 			} else {
 				fmt.Fprint(rw, string(shell_out))
@@ -116,7 +116,7 @@ func setup_handlers(cmd_handlers []t_command) {
 			return
 		}
 
-		fmt.Printf("register: %s (%s)\n", path, cmd)
+		log.Printf("register: %s (%s)\n", path, cmd)
 		http.HandleFunc(path, shell_handler)
 		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, path, path)
 	}
@@ -124,7 +124,7 @@ func setup_handlers(cmd_handlers []t_command) {
 	// --------------
 	index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
 	http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		fmt.Println("GET /")
+		log.Println("GET /")
 		fmt.Fprint(rw, index_html)
 
 		return
@@ -132,7 +132,7 @@ func setup_handlers(cmd_handlers []t_command) {
 
 	// --------------
 	http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
-		fmt.Println("GET /exit")
+		log.Println("GET /exit")
 		fmt.Fprint(rw, "Bye...")
 		go os.Exit(0)
 
@@ -144,16 +144,16 @@ func setup_handlers(cmd_handlers []t_command) {
 func main() {
 	cmd_handlers, host, port, err := get_config()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	setup_handlers(cmd_handlers)
 
 	adress := fmt.Sprintf("%s:%d", host, port)
-	fmt.Printf("listen http://%s/\n", adress)
+	log.Printf("listen http://%s/\n", adress)
 	err = http.ListenAndServe(adress, nil)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 }
