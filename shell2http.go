@@ -200,6 +200,19 @@ func set_cgi_env(req *http.Request, path string, host string, port int) {
 // ------------------------------------------------------------------
 // parse form into enviroment vars
 func get_form(req *http.Request) {
+	// clear old variables
+	for _, env_raw := range os.Environ() {
+		env := strings.SplitN(env_raw, "=", 2)
+		if strings.HasPrefix(env[0], "v_") && len(env[0]) > 2 {
+			err := os.Unsetenv(env[0])
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		}
+	}
+
+	// set new
 	err := req.ParseForm()
 	if err != nil {
 		log.Println(err)
