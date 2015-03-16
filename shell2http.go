@@ -174,19 +174,22 @@ func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi boo
 // ------------------------------------------------------------------
 // set some CGI variables
 func set_cgi_env(req *http.Request, path string, host string, port int) {
-	headers := map[string]string{
-		"Accept":          "HTTP_ACCEPT",
-		"Accept-Encoding": "HTTP_ACCEPT_ENCODING",
-		"Accept-Language": "HTTP_ACCEPT_LANGUAGE",
-		"User-Agent":      "HTTP_USER_AGENT",
+	req_headers := [...]struct {
+		req_name, cgi_name string
+	}{
+		{"Accept", "HTTP_ACCEPT"},
+		{"Accept-Encoding", "HTTP_ACCEPT_ENCODING"},
+		{"Accept-Language", "HTTP_ACCEPT_LANGUAGE"},
+		{"User-Agent", "HTTP_USER_AGENT"},
 	}
-	for header_key, cgi_var_name := range headers {
-		if header, exists := req.Header[header_key]; exists && len(header) > 0 {
-			os.Setenv(cgi_var_name, header[0])
+
+	for _, row := range req_headers {
+		if header, exists := req.Header[row.req_name]; exists && len(header) > 0 {
+			os.Setenv(row.cgi_name, header[0])
 		}
 	}
-	remote_addr := strings.Split(req.RemoteAddr, ":")
 
+	remote_addr := strings.Split(req.RemoteAddr, ":")
 	CGI_vars := [...]struct {
 		name, value string
 	}{
