@@ -133,7 +133,10 @@ func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi boo
 				set_cgi_env(req, path, host, port)
 			}
 
-			shell_out, err := exec.Command("sh", "-c", cmd).Output()
+			os_exec_command := exec.Command("sh", "-c", cmd)
+			os_exec_command.Stderr = os.Stderr
+			shell_out, err := os_exec_command.Output()
+
 			if err != nil {
 				log.Println("exec error: ", err)
 				fmt.Fprint(rw, "exec error: ", err)
