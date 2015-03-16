@@ -187,17 +187,25 @@ func set_cgi_env(req *http.Request, path string, host string, port int) {
 	}
 	remote_addr := strings.Split(req.RemoteAddr, ":")
 
-	os.Setenv("PATH_INFO", req.URL.Path)
-	os.Setenv("QUERY_STRING", req.URL.RawQuery)
-	os.Setenv("REMOTE_ADDR", remote_addr[0])
-	os.Setenv("REMOTE_PORT", remote_addr[1])
-	os.Setenv("REQUEST_METHOD", req.Method)
-	os.Setenv("REQUEST_URI", req.RequestURI)
-	os.Setenv("SCRIPT_NAME", path)
-	os.Setenv("SERVER_NAME", host)
-	os.Setenv("SERVER_PORT", fmt.Sprintf("%d", port))
-	os.Setenv("SERVER_PROTOCOL", req.Proto)
-	os.Setenv("SERVER_SOFTWARE", "shell2http")
+	CGI_vars := [...]struct {
+		name, value string
+	}{
+		{"PATH_INFO", req.URL.Path},
+		{"QUERY_STRING", req.URL.RawQuery},
+		{"REMOTE_ADDR", remote_addr[0]},
+		{"REMOTE_PORT", remote_addr[1]},
+		{"REQUEST_METHOD", req.Method},
+		{"REQUEST_URI", req.RequestURI},
+		{"SCRIPT_NAME", path},
+		{"SERVER_NAME", host},
+		{"SERVER_PORT", fmt.Sprintf("%d", port)},
+		{"SERVER_PROTOCOL", req.Proto},
+		{"SERVER_SOFTWARE", "shell2http"},
+	}
+
+	for _, row := range CGI_vars {
+		os.Setenv(row.name, row.value)
+	}
 }
 
 // ------------------------------------------------------------------
