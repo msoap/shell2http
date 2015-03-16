@@ -41,7 +41,7 @@ Examples
     shell2http -form /form 'echo $v_from, $v_to'
     
     # pseudo-CGI scripts
-    shell2http -cgi /query 'echo $QUERY_STRING'
+    shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 
 Update
 ------

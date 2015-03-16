@@ -23,7 +23,7 @@ Examples:
 	shell2http /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 	shell2http -form /form 'echo $v_from, $v_to'
-	shell2http -cgi /query 'echo $QUERY_STRING'
+	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 
 Update:
 	go get -u github.com/msoap/shell2http
