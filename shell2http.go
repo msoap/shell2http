@@ -74,14 +74,23 @@ type t_command struct {
 }
 
 // ------------------------------------------------------------------
+// config struct
+type t_config struct {
+	host     string // server host
+	port     int    // server port
+	set_cgi  bool   // set CGI variables
+	set_form bool   // parse form from URL
+}
+
+// ------------------------------------------------------------------
 // parse arguments
-func get_config() (cmd_handlers []t_command, host string, port int, set_cgi bool, set_form bool, err error) {
+func get_config() (cmd_handlers []t_command, config t_config, err error) {
 	var log_filename string
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
-	flag.IntVar(&port, "port", PORT, "port for http server")
-	flag.StringVar(&host, "host", HOST, "host for http server")
-	flag.BoolVar(&set_cgi, "cgi", false, "set some CGI variables in enviroment")
-	flag.BoolVar(&set_form, "form", false, "parse query into enviroment vars")
+	flag.IntVar(&config.port, "port", PORT, "port for http server")
+	flag.StringVar(&config.host, "host", HOST, "host for http server")
+	flag.BoolVar(&config.set_cgi, "cgi", false, "set some CGI variables in enviroment")
+	flag.BoolVar(&config.set_form, "form", false, "parse query into enviroment vars")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -101,36 +110,36 @@ func get_config() (cmd_handlers []t_command, host string, port int, set_cgi bool
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
 	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, host, port, set_cgi, set_form, fmt.Errorf("error: need pairs of path and shell command")
+		return nil, t_config{}, fmt.Errorf("error: need pairs of path and shell command")
 	}
 
 	args_i := 0
 	for args_i < len(args) {
 		path, cmd := args[args_i], args[args_i+1]
 		if path[0] != '/' {
-			return nil, host, port, set_cgi, set_form, fmt.Errorf("error: path %s dont starts with /", path)
+			return nil, t_config{}, fmt.Errorf("error: path %s dont starts with /", path)
 		}
 		cmd_handlers = append(cmd_handlers, t_command{path: path, cmd: cmd})
 		args_i += 2
 	}
 
-	return cmd_handlers, host, port, set_cgi, set_form, nil
+	return cmd_handlers, config, nil
 }
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi bool, set_form bool) {
+func setup_handlers(cmd_handlers []t_command, config t_config) {
 	index_li_html := ""
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET", path)
 
-			if set_form {
+			if config.set_form {
 				get_form(req)
 			}
-			if set_cgi {
-				set_cgi_env(req, path, host, port)
+			if config.set_cgi {
+				set_cgi_env(req, config)
 			}
 
 			os_exec_command := exec.Command("sh", "-c", cmd)
@@ -173,7 +182,7 @@ func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi boo
 
 // ------------------------------------------------------------------
 // set some CGI variables
-func set_cgi_env(req *http.Request, path string, host string, port int) {
+func set_cgi_env(req *http.Request, config t_config) {
 	req_headers := [...]struct {
 		req_name, cgi_name string
 	}{
@@ -199,9 +208,9 @@ func set_cgi_env(req *http.Request, path string, host string, port int) {
 		{"REMOTE_PORT", remote_addr[1]},
 		{"REQUEST_METHOD", req.Method},
 		{"REQUEST_URI", req.RequestURI},
-		{"SCRIPT_NAME", path},
-		{"SERVER_NAME", host},
-		{"SERVER_PORT", fmt.Sprintf("%d", port)},
+		{"SCRIPT_NAME", req.URL.Path},
+		{"SERVER_NAME", config.host},
+		{"SERVER_PORT", fmt.Sprintf("%d", config.port)},
 		{"SERVER_PROTOCOL", req.Proto},
 		{"SERVER_SOFTWARE", "shell2http"},
 	}
@@ -240,14 +249,14 @@ func get_form(req *http.Request) {
 
 // ------------------------------------------------------------------
 func main() {
-	cmd_handlers, host, port, set_cgi, set_form, err := get_config()
+	cmd_handlers, config, err := get_config()
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	setup_handlers(cmd_handlers, host, port, set_cgi, set_form)
+	setup_handlers(cmd_handlers, config)
 
-	adress := fmt.Sprintf("%s:%d", host, port)
+	adress := fmt.Sprintf("%s:%d", config.host, config.port)
 	log.Printf("listen http://%s/\n", adress)
 	err = http.ListenAndServe(adress, nil)
 	if err != nil {
