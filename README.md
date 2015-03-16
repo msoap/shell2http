@@ -21,6 +21,7 @@ Usage
         -host="host" : host for http server
         -host=       : for bind to all hosts
         -port=NNNN   : port for http server
+        -form        : parse query into enviroment vars
         -cgi         : set some CGI variables in enviroment
         -log=filename: log filename, default - STDOUT
         -help
@@ -32,7 +33,14 @@ Examples
     shell2http /date date /ps "ps aux"
     shell2http /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
     shell2http /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
+    
+    # HTML calendar for current year
     shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
+    
+    # get URL parameters http://localhost:8080/query?from=10&to=100
+    shell2http -form /form 'echo $v_from, $v_to'
+    
+    # pseudo-CGI scripts
     shell2http -cgi /query 'echo $QUERY_STRING'
 
 Update

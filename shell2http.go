@@ -11,6 +11,7 @@ Usage:
 		-host="host" : host for http server
 		-host=       : for bind to all hosts
 		-port=NNNN   : port for http server
+		-form        : parse query into enviroment vars
 		-cgi         : set some CGI variables in enviroment
 		-log=filename: log filename, default - STDOUT
 		-help
@@ -21,6 +22,7 @@ Examples:
 	shell2http /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
 	shell2http /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
+	shell2http -form /form 'echo $v_from, $v_to'
 	shell2http -cgi /query 'echo $QUERY_STRING'
 
 Update:
@@ -73,12 +75,13 @@ type t_command struct {
 
 // ------------------------------------------------------------------
 // parse arguments
-func get_config() (cmd_handlers []t_command, host string, port int, set_cgi bool, err error) {
+func get_config() (cmd_handlers []t_command, host string, port int, set_cgi bool, set_form bool, err error) {
 	var log_filename string
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&port, "port", PORT, "port for http server")
 	flag.StringVar(&host, "host", HOST, "host for http server")
 	flag.BoolVar(&set_cgi, "cgi", false, "set some CGI variables in enviroment")
+	flag.BoolVar(&set_form, "form", false, "parse query into enviroment vars")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -98,34 +101,38 @@ func get_config() (cmd_handlers []t_command, host string, port int, set_cgi bool
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
 	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, host, port, set_cgi, fmt.Errorf("error: need pairs of path and shell command")
+		return nil, host, port, set_cgi, set_form, fmt.Errorf("error: need pairs of path and shell command")
 	}
 
 	args_i := 0
 	for args_i < len(args) {
 		path, cmd := args[args_i], args[args_i+1]
 		if path[0] != '/' {
-			return nil, host, port, set_cgi, fmt.Errorf("error: path %s dont starts with /", path)
+			return nil, host, port, set_cgi, set_form, fmt.Errorf("error: path %s dont starts with /", path)
 		}
 		cmd_handlers = append(cmd_handlers, t_command{path: path, cmd: cmd})
 		args_i += 2
 	}
 
-	return cmd_handlers, host, port, set_cgi, nil
+	return cmd_handlers, host, port, set_cgi, set_form, nil
 }
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi bool) {
+func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi bool, set_form bool) {
 	index_li_html := ""
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET", path)
 
+			if set_form {
+				get_form(req)
+			}
 			if set_cgi {
 				set_cgi_env(req, path, host, port)
 			}
+
 			shell_out, err := exec.Command("sh", "-c", cmd).Output()
 			if err != nil {
 				log.Println("exec error: ", err)
@@ -162,6 +169,7 @@ func setup_handlers(cmd_handlers []t_command, host string, port int, set_cgi boo
 }
 
 // ------------------------------------------------------------------
+// set some CGI variables
 func set_cgi_env(req *http.Request, path string, host string, port int) {
 	headers := map[string]string{
 		"Accept":          "HTTP_ACCEPT",
@@ -190,13 +198,27 @@ func set_cgi_env(req *http.Request, path string, host string, port int) {
 }
 
 // ------------------------------------------------------------------
-func main() {
-	cmd_handlers, host, port, set_cgi, err := get_config()
+// parse form into enviroment vars
+func get_form(req *http.Request) {
+	err := req.ParseForm()
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	setup_handlers(cmd_handlers, host, port, set_cgi)
+
+	for key, value := range req.Form {
+		os.Setenv("v_"+key, strings.Join(value, ","))
+	}
+}
+
+// ------------------------------------------------------------------
+func main() {
+	cmd_handlers, host, port, set_cgi, set_form, err := get_config()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	setup_handlers(cmd_handlers, host, port, set_cgi, set_form)
 
 	adress := fmt.Sprintf("%s:%d", host, port)
 	log.Printf("listen http://%s/\n", adress)
