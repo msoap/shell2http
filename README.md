@@ -37,7 +37,7 @@ Examples
     # HTML calendar for current year
     shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
     
-    # get URL parameters http://localhost:8080/query?from=10&to=100
+    # get URL parameters http://localhost:8080/form?from=10&to=100
     shell2http -form /form 'echo $v_from, $v_to'
     
     # pseudo-CGI scripts
