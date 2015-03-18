@@ -42,6 +42,11 @@ Examples
     
     # pseudo-CGI scripts
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+    
+    # remote sound volume control (Mac OS)
+    shell2http /get  'osascript -e "output volume of (get volume settings)"' \
+               /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
+               /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
 
 Update
 ------
