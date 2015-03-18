@@ -47,6 +47,10 @@ Examples
     shell2http /get  'osascript -e "output volume of (get volume settings)"' \
                /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
                /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
+    
+    # remote control for Vox.app player (Mac OS)
+    shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
+               /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
 
 Update
 ------
