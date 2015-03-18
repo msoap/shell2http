@@ -8,9 +8,9 @@ Install:
 Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
-		-host="host" : host for http server
+		-host="host" : host for http server, default - localhost
 		-host=       : for bind to all hosts
-		-port=NNNN   : port for http server
+		-port=NNNN   : port for http server, default - 8080
 		-form        : parse query into enviroment vars
 		-cgi         : set some CGI variables in enviroment
 		-log=filename: log filename, default - STDOUT
