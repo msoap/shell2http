@@ -34,21 +34,21 @@ Examples
     shell2http /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
     shell2http /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
 
-### HTML calendar for current year
+#### HTML calendar for current year
     shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 
-### get URL parameters http://localhost:8080/form?from=10&to=100
+#### get URL parameters http://localhost:8080/form?from=10&to=100
     shell2http -form /form 'echo $v_from, $v_to'
 
-### pseudo-CGI scripts
+#### pseudo-CGI scripts
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 
-### remote sound volume control (Mac OS)
+#### remote sound volume control (Mac OS)
     shell2http /get  'osascript -e "output volume of (get volume settings)"' \
                /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
                /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
 
-### remote control for Vox.app player (Mac OS)
+#### remote control for Vox.app player (Mac OS)
     shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
                /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
 
