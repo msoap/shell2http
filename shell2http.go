@@ -135,14 +135,16 @@ func setup_handlers(cmd_handlers []t_command, config t_config) {
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET", path)
 
+			os_exec_command := exec.Command("sh", "-c", cmd)
+
+			proxy_system_env(os_exec_command)
 			if config.set_form {
-				get_form(req)
+				get_form(os_exec_command, req)
 			}
 			if config.set_cgi {
-				set_cgi_env(req, config)
+				set_cgi_env(os_exec_command, req, config)
 			}
 
-			os_exec_command := exec.Command("sh", "-c", cmd)
 			os_exec_command.Stderr = os.Stderr
 			shell_out, err := os_exec_command.Output()
 
@@ -182,7 +184,7 @@ func setup_handlers(cmd_handlers []t_command, config t_config) {
 
 // ------------------------------------------------------------------
 // set some CGI variables
-func set_cgi_env(req *http.Request, config t_config) {
+func set_cgi_env(cmd *exec.Cmd, req *http.Request, config t_config) {
 	req_headers := [...]struct {
 		req_name, cgi_name string
 	}{
@@ -194,7 +196,7 @@ func set_cgi_env(req *http.Request, config t_config) {
 
 	for _, row := range req_headers {
 		if header, exists := req.Header[row.req_name]; exists && len(header) > 0 {
-			os.Setenv(row.cgi_name, header[0])
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgi_name, header[0]))
 		}
 	}
 
@@ -216,26 +218,13 @@ func set_cgi_env(req *http.Request, config t_config) {
 	}
 
 	for _, row := range CGI_vars {
-		os.Setenv(row.name, row.value)
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.name, row.value))
 	}
 }
 
 // ------------------------------------------------------------------
 // parse form into enviroment vars
-func get_form(req *http.Request) {
-	// clear old variables
-	for _, env_raw := range os.Environ() {
-		env := strings.SplitN(env_raw, "=", 2)
-		if strings.HasPrefix(env[0], "v_") && len(env[0]) > 2 {
-			err := os.Unsetenv(env[0])
-			if err != nil {
-				log.Println(err)
-				return
-			}
-		}
-	}
-
-	// set new
+func get_form(cmd *exec.Cmd, req *http.Request) {
 	err := req.ParseForm()
 	if err != nil {
 		log.Println(err)
@@ -243,7 +232,20 @@ func get_form(req *http.Request) {
 	}
 
 	for key, value := range req.Form {
-		os.Setenv("v_"+key, strings.Join(value, ","))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+key, strings.Join(value, ",")))
+	}
+}
+
+// ------------------------------------------------------------------
+// proxy some system vars
+func proxy_system_env(cmd *exec.Cmd) {
+	for _, env_raw := range os.Environ() {
+		env := strings.SplitN(env_raw, "=", 2)
+		for _, env_var_name := range [...]string{"PATH", "HOME", "LANG", "USER", "TMPDIR"} {
+			if env[0] == env_var_name {
+				cmd.Env = append(cmd.Env, env_raw)
+			}
+		}
 	}
 }
 
