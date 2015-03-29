@@ -21,8 +21,8 @@ Usage
         -host="host" : host for http server, default - localhost
         -host=       : for bind to all hosts
         -port=NNNN   : port for http server, default - 8080
-        -form        : parse query into enviroment vars
-        -cgi         : set some CGI variables in enviroment
+        -form        : parse query into environment vars
+        -cgi         : set some CGI variables in environment
         -log=filename: log filename, default - STDOUT
         -help
 

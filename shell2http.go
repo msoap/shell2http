@@ -11,8 +11,8 @@ Usage:
 		-host="host" : host for http server, default - localhost
 		-host=       : for bind to all hosts
 		-port=NNNN   : port for http server, default - 8080
-		-form        : parse query into enviroment vars
-		-cgi         : set some CGI variables in enviroment
+		-form        : parse query into environment vars
+		-cgi         : set some CGI variables in environment
 		-log=filename: log filename, default - STDOUT
 		-help
 
@@ -89,8 +89,8 @@ func get_config() (cmd_handlers []t_command, config t_config, err error) {
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&config.port, "port", PORT, "port for http server")
 	flag.StringVar(&config.host, "host", HOST, "host for http server")
-	flag.BoolVar(&config.set_cgi, "cgi", false, "set some CGI variables in enviroment")
-	flag.BoolVar(&config.set_form, "form", false, "parse query into enviroment vars")
+	flag.BoolVar(&config.set_cgi, "cgi", false, "set some CGI variables in environment")
+	flag.BoolVar(&config.set_form, "form", false, "parse query into environment vars")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -223,7 +223,7 @@ func set_cgi_env(cmd *exec.Cmd, req *http.Request, config t_config) {
 }
 
 // ------------------------------------------------------------------
-// parse form into enviroment vars
+// parse form into environment vars
 func get_form(cmd *exec.Cmd, req *http.Request) {
 	err := req.ParseForm()
 	if err != nil {
