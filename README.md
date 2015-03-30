@@ -18,8 +18,7 @@ Usage
 
     shell2http [options] /path "shell command" /path2 "shell command2" ...
     options:
-        -host="host" : host for http server, default - localhost
-        -host=       : for bind to all hosts
+        -host="host" : host for http server, default - all interfaces
         -port=NNNN   : port for http server, default - 8080
         -form        : parse query into environment vars
         -cgi         : set some CGI variables in environment

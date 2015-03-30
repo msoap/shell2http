@@ -8,8 +8,7 @@ Install:
 Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
-		-host="host" : host for http server, default - localhost
-		-host=       : for bind to all hosts
+		-host="host" : host for http server, default - all interfaces
 		-port=NNNN   : port for http server, default - 8080
 		-form        : parse query into environment vars
 		-cgi         : set some CGI variables in environment
@@ -44,9 +43,6 @@ import (
 
 // default port for http-server
 const PORT = 8080
-
-// default host for bind
-const HOST = "localhost"
 
 // ------------------------------------------------------------------
 const INDEX_HTML = `
@@ -88,7 +84,7 @@ func get_config() (cmd_handlers []t_command, config t_config, err error) {
 	var log_filename string
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&config.port, "port", PORT, "port for http server")
-	flag.StringVar(&config.host, "host", HOST, "host for http server")
+	flag.StringVar(&config.host, "host", "", "host for http server")
 	flag.BoolVar(&config.set_cgi, "cgi", false, "set some CGI variables in environment")
 	flag.BoolVar(&config.set_form, "form", false, "parse query into environment vars")
 	flag.Usage = func() {
