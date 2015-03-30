@@ -64,14 +64,14 @@ const INDEX_HTML = `
 
 // ------------------------------------------------------------------
 // one command type
-type t_command struct {
+type command struct {
 	path string
 	cmd  string
 }
 
 // ------------------------------------------------------------------
 // config struct
-type t_config struct {
+type config struct {
 	host     string // server host
 	port     int    // server port
 	set_cgi  bool   // set CGI variables
@@ -80,13 +80,13 @@ type t_config struct {
 
 // ------------------------------------------------------------------
 // parse arguments
-func get_config() (cmd_handlers []t_command, config t_config, err error) {
+func get_config() (cmd_handlers []command, app_config config, err error) {
 	var log_filename string
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
-	flag.IntVar(&config.port, "port", PORT, "port for http server")
-	flag.StringVar(&config.host, "host", "", "host for http server")
-	flag.BoolVar(&config.set_cgi, "cgi", false, "set some CGI variables in environment")
-	flag.BoolVar(&config.set_form, "form", false, "parse query into environment vars")
+	flag.IntVar(&app_config.port, "port", PORT, "port for http server")
+	flag.StringVar(&app_config.host, "host", "", "host for http server")
+	flag.BoolVar(&app_config.set_cgi, "cgi", false, "set some CGI variables in environment")
+	flag.BoolVar(&app_config.set_form, "form", false, "parse query into environment vars")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -106,25 +106,25 @@ func get_config() (cmd_handlers []t_command, config t_config, err error) {
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
 	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, t_config{}, fmt.Errorf("error: need pairs of path and shell command")
+		return nil, config{}, fmt.Errorf("error: need pairs of path and shell command")
 	}
 
 	args_i := 0
 	for args_i < len(args) {
 		path, cmd := args[args_i], args[args_i+1]
 		if path[0] != '/' {
-			return nil, t_config{}, fmt.Errorf("error: path %s dont starts with /", path)
+			return nil, config{}, fmt.Errorf("error: path %s dont starts with /", path)
 		}
-		cmd_handlers = append(cmd_handlers, t_command{path: path, cmd: cmd})
+		cmd_handlers = append(cmd_handlers, command{path: path, cmd: cmd})
 		args_i += 2
 	}
 
-	return cmd_handlers, config, nil
+	return cmd_handlers, app_config, nil
 }
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setup_handlers(cmd_handlers []t_command, config t_config) {
+func setup_handlers(cmd_handlers []command, app_config config) {
 	index_li_html := ""
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
@@ -134,11 +134,11 @@ func setup_handlers(cmd_handlers []t_command, config t_config) {
 			os_exec_command := exec.Command("sh", "-c", cmd)
 
 			proxy_system_env(os_exec_command)
-			if config.set_form {
+			if app_config.set_form {
 				get_form(os_exec_command, req)
 			}
-			if config.set_cgi {
-				set_cgi_env(os_exec_command, req, config)
+			if app_config.set_cgi {
+				set_cgi_env(os_exec_command, req, app_config)
 			}
 
 			os_exec_command.Stderr = os.Stderr
@@ -180,7 +180,7 @@ func setup_handlers(cmd_handlers []t_command, config t_config) {
 
 // ------------------------------------------------------------------
 // set some CGI variables
-func set_cgi_env(cmd *exec.Cmd, req *http.Request, config t_config) {
+func set_cgi_env(cmd *exec.Cmd, req *http.Request, app_config config) {
 	req_headers := [...]struct {
 		req_name, cgi_name string
 	}{
@@ -207,8 +207,8 @@ func set_cgi_env(cmd *exec.Cmd, req *http.Request, config t_config) {
 		{"REQUEST_METHOD", req.Method},
 		{"REQUEST_URI", req.RequestURI},
 		{"SCRIPT_NAME", req.URL.Path},
-		{"SERVER_NAME", config.host},
-		{"SERVER_PORT", fmt.Sprintf("%d", config.port)},
+		{"SERVER_NAME", app_config.host},
+		{"SERVER_PORT", fmt.Sprintf("%d", app_config.port)},
 		{"SERVER_PROTOCOL", req.Proto},
 		{"SERVER_SOFTWARE", "shell2http"},
 	}
@@ -247,14 +247,14 @@ func proxy_system_env(cmd *exec.Cmd) {
 
 // ------------------------------------------------------------------
 func main() {
-	cmd_handlers, config, err := get_config()
+	cmd_handlers, app_config, err := get_config()
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	setup_handlers(cmd_handlers, config)
+	setup_handlers(cmd_handlers, app_config)
 
-	adress := fmt.Sprintf("%s:%d", config.host, config.port)
+	adress := fmt.Sprintf("%s:%d", app_config.host, app_config.port)
 	log.Printf("listen http://%s/\n", adress)
 	err = http.ListenAndServe(adress, nil)
 	if err != nil {
