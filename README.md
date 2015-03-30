@@ -44,7 +44,7 @@ Examples
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 
 ##### test slow connection
-    shell2http -form /slow 'sleep $v_duration; echo "sleep $v_duration seconds"'
+    shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 
 ##### remote sound volume control (Mac OS)
     shell2http /get  'osascript -e "output volume of (get volume settings)"' \
