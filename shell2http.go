@@ -109,14 +109,12 @@ func get_config() (cmd_handlers []command, app_config config, err error) {
 		return nil, config{}, fmt.Errorf("error: need pairs of path and shell command")
 	}
 
-	args_i := 0
-	for args_i < len(args) {
-		path, cmd := args[args_i], args[args_i+1]
+	for i := 0; i < len(args); i += 2 {
+		path, cmd := args[i], args[i+1]
 		if path[0] != '/' {
 			return nil, config{}, fmt.Errorf("error: path %s dont starts with /", path)
 		}
 		cmd_handlers = append(cmd_handlers, command{path: path, cmd: cmd})
-		args_i += 2
 	}
 
 	return cmd_handlers, app_config, nil
