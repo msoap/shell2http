@@ -249,8 +249,7 @@ func proxy_system_env(cmd *exec.Cmd) {
 func main() {
 	cmd_handlers, app_config, err := get_config()
 	if err != nil {
-		log.Println(err)
-		return
+		log.Fatal(err)
 	}
 	setup_handlers(cmd_handlers, app_config)
 
@@ -258,7 +257,6 @@ func main() {
 	log.Printf("listen http://%s/\n", adress)
 	err = http.ListenAndServe(adress, nil)
 	if err != nil {
-		log.Println(err)
-		return
+		log.Fatal(err)
 	}
 }
