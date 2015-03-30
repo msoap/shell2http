@@ -43,6 +43,9 @@ Examples
 ##### pseudo-CGI scripts
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 
+##### test slow connection
+    shell2http -form /slow 'sleep $v_duration; echo "sleep $v_duration seconds"'
+
 ##### remote sound volume control (Mac OS)
     shell2http /get  'osascript -e "output volume of (get volume settings)"' \
                /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
