@@ -8,6 +8,10 @@ By default bind to localhost:8080.
 Install
 -------
 
+Download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
+
+From source:
+
     # install Go (brew install go ...)
     # set $GOPATH if needed
     go get github.com/msoap/shell2http
