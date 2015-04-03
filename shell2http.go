@@ -13,6 +13,7 @@ Usage:
 		-form        : parse query into environment vars
 		-cgi         : set some CGI variables in environment
 		-log=filename: log filename, default - STDOUT
+		-version
 		-help
 
 Examples:
@@ -40,6 +41,9 @@ import (
 	"os/exec"
 	"strings"
 )
+
+// version
+const VERSION = 1.1
 
 // default port for http-server
 const PORT = 8080
@@ -92,7 +96,12 @@ func get_config() (cmd_handlers []command, app_config config, err error) {
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
+	version := flag.Bool("version", false, "get version")
 	flag.Parse()
+	if *version {
+		fmt.Println(VERSION)
+		os.Exit(0)
+	}
 
 	// setup log file
 	if len(log_filename) > 0 {

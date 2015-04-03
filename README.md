@@ -27,6 +27,7 @@ Usage
         -form        : parse query into environment vars
         -cgi         : set some CGI variables in environment
         -log=filename: log filename, default - STDOUT
+        -version
         -help
 
 Examples
