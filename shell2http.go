@@ -169,6 +169,11 @@ func setup_handlers(cmd_handlers []command, app_config config) {
 	// --------------
 	index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
 	http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/" {
+			log.Println("404")
+			http.NotFound(rw, req)
+			return
+		}
 		log.Println("GET /")
 		fmt.Fprint(rw, index_html)
 
