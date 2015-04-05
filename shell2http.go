@@ -1,8 +1,10 @@
 /*
-Execute shell commands via http server
+Executing shell commands via simple http server.
+Settings through 2 command line arguments, path and shell command.
+By default bind to :8080.
 
-Install:
-	go get github.com/msoap/shell2http
+Install/update:
+	go get -u github.com/msoap/shell2http
 	ln -s $GOPATH/bin/shell2http ~/bin/shell2http
 
 Usage:
@@ -27,9 +29,20 @@ Examples:
 	shell2http -form /form 'echo $v_from, $v_to'
 	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 
-Update:
-	go get -u github.com/msoap/shell2http
+More complex examples:
 
+test slow connection
+	# http://localhost:8080/slow?duration=10
+    shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
+
+remote sound volume control (Mac OS)
+    shell2http /get  'osascript -e "output volume of (get volume settings)"' \
+               /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
+               /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
+
+remote control for Vox.app player (Mac OS)
+    shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
+               /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
 */
 package main
 
