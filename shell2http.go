@@ -12,6 +12,7 @@ Usage:
 		-port=NNNN   : port for http server, default - 8080
 		-form        : parse query into environment vars
 		-cgi         : set some CGI variables in environment
+		-no-index    : dont generate index page
 		-log=filename: log filename, default - STDOUT
 		-version
 		-help
@@ -80,6 +81,7 @@ type config struct {
 	port     int    // server port
 	set_cgi  bool   // set CGI variables
 	set_form bool   // parse form from URL
+	no_index bool   // dont generate index page
 }
 
 // ------------------------------------------------------------------
@@ -91,6 +93,7 @@ func get_config() (cmd_handlers []command, app_config config, err error) {
 	flag.StringVar(&app_config.host, "host", "", "host for http server")
 	flag.BoolVar(&app_config.set_cgi, "cgi", false, "set some CGI variables in environment")
 	flag.BoolVar(&app_config.set_form, "form", false, "parse query into environment vars")
+	flag.BoolVar(&app_config.no_index, "no-index", false, "dont generate index page")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -167,18 +170,20 @@ func setup_handlers(cmd_handlers []command, app_config config) {
 	}
 
 	// --------------
-	index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
-	http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		if req.URL.Path != "/" {
-			log.Println("404")
-			http.NotFound(rw, req)
-			return
-		}
-		log.Println("GET /")
-		fmt.Fprint(rw, index_html)
+	if !app_config.no_index {
+		index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
+		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
+			if req.URL.Path != "/" {
+				log.Println("404")
+				http.NotFound(rw, req)
+				return
+			}
+			log.Println("GET /")
+			fmt.Fprint(rw, index_html)
 
-		return
-	})
+			return
+		})
+	}
 
 	// --------------
 	http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
