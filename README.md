@@ -27,6 +27,7 @@ Usage
         -form        : parse query into environment vars
         -cgi         : set some CGI variables in environment
         -no-index    : dont generate index page
+        -add-exit    : add /exit command
         -log=filename: log filename, default - STDOUT
         -version
         -help

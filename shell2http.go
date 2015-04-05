@@ -13,6 +13,7 @@ Usage:
 		-form        : parse query into environment vars
 		-cgi         : set some CGI variables in environment
 		-no-index    : dont generate index page
+		-add-exit    : add /exit command
 		-log=filename: log filename, default - STDOUT
 		-version
 		-help
@@ -60,7 +61,6 @@ const INDEX_HTML = `
 	<h1>shell2http</h1>
 	<ul>
 		%s
-		<li><a href="/exit">/exit</a></li>
 	</ul>
 	Get from: <a href="https://github.com/msoap/shell2http">github.com/msoap/shell2http</a>
 </body>
@@ -82,6 +82,7 @@ type config struct {
 	set_cgi  bool   // set CGI variables
 	set_form bool   // parse form from URL
 	no_index bool   // dont generate index page
+	add_exit bool   // add /exit command
 }
 
 // ------------------------------------------------------------------
@@ -94,6 +95,7 @@ func get_config() (cmd_handlers []command, app_config config, err error) {
 	flag.BoolVar(&app_config.set_cgi, "cgi", false, "set some CGI variables in environment")
 	flag.BoolVar(&app_config.set_form, "form", false, "parse query into environment vars")
 	flag.BoolVar(&app_config.no_index, "no-index", false, "dont generate index page")
+	flag.BoolVar(&app_config.add_exit, "add-exit", false, "add /exit command")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -164,9 +166,24 @@ func setup_handlers(cmd_handlers []command, app_config config) {
 			return
 		}
 
-		log.Printf("register: %s (%s)\n", path, cmd)
 		http.HandleFunc(path, shell_handler)
+
+		log.Printf("register: %s (%s)\n", path, cmd)
 		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+	}
+
+	// --------------
+	if app_config.add_exit {
+		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
+			log.Println("GET /exit")
+			fmt.Fprint(rw, "Bye...")
+			go os.Exit(0)
+
+			return
+		})
+
+		log.Printf("register: %s (%s)\n", "/exit", "/exit")
+		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, "/exit", "/exit")
 	}
 
 	// --------------
@@ -184,15 +201,6 @@ func setup_handlers(cmd_handlers []command, app_config config) {
 			return
 		})
 	}
-
-	// --------------
-	http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
-		log.Println("GET /exit")
-		fmt.Fprint(rw, "Bye...")
-		go os.Exit(0)
-
-		return
-	})
 }
 
 // ------------------------------------------------------------------
