@@ -33,16 +33,18 @@ More complex examples:
 
 test slow connection
 	# http://localhost:8080/slow?duration=10
-    shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
+	shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 
 remote sound volume control (Mac OS)
-    shell2http /get  'osascript -e "output volume of (get volume settings)"' \
-               /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
-               /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
+	shell2http \
+		/get  'osascript -e "output volume of (get volume settings)"' \
+		/up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
+		/down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
 
 remote control for Vox.app player (Mac OS)
-    shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
-               /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
+	shell2http \
+		/play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
+		/get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
 */
 package main
 
