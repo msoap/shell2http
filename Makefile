@@ -1,7 +1,7 @@
 build:
 	go build shell2http.go
 
-VERSION=$$(git tag | head -1)
+VERSION=$$(git tag | grep -E '^[0-9]+' | tail -1)
 build-all-platform:
 	@for GOOS in linux darwin windows; \
 	do \
