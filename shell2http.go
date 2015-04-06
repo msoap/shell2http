@@ -221,19 +221,10 @@ func setup_handlers(cmd_handlers []command, app_config config) {
 // ------------------------------------------------------------------
 // set some CGI variables
 func set_cgi_env(cmd *exec.Cmd, req *http.Request, app_config config) {
-	req_headers := [...]struct {
-		cgi_name, req_field_name string
-	}{
-		{"HTTP_ACCEPT", "Accept"},
-		{"HTTP_ACCEPT_ENCODING", "Accept-Encoding"},
-		{"HTTP_ACCEPT_LANGUAGE", "Accept-Language"},
-		{"HTTP_USER_AGENT", "User-Agent"},
-	}
-
-	for _, row := range req_headers {
-		if header, exists := req.Header[row.req_field_name]; exists && len(header) > 0 {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgi_name, header[0]))
-		}
+	// set HTTP_* variables
+	for header_name, header_value := range req.Header {
+		env_name := strings.ToUpper(strings.Replace(header_name, "-", "_", -1))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", env_name, header_value[0]))
 	}
 
 	remote_addr := strings.Split(req.RemoteAddr, ":")
