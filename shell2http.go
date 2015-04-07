@@ -45,6 +45,11 @@ remote control for Vox.app player (Mac OS)
 	shell2http \
 		/play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
 		/get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
+
+get four random OS X wallpapers
+	shell2http \
+		/img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
+		/wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
 */
 package main
 
