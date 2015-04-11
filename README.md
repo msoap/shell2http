@@ -54,6 +54,11 @@ Examples
 ##### test slow connection (http://localhost:8080/slow?duration=10)
     shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 
+##### proxy with cache in files (for debug with production API with rate limit)
+    shell2http -form \
+        /form 'echo "<html><form action=/get><input name=url><input type=submit>"' \
+        /get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -s $v_url | tee cache_$MD5)'
+
 ##### remote sound volume control (Mac OS)
     shell2http /get  'osascript -e "output volume of (get volume settings)"' \
                /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
