@@ -71,8 +71,7 @@ const VERSION = 1.2
 const PORT = 8080
 
 // ------------------------------------------------------------------
-const INDEX_HTML = `
-<!DOCTYPE html>
+const INDEX_HTML = `<!DOCTYPE html>
 <html>
 <head>
 	<title>shell2http</title>
