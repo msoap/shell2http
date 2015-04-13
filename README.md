@@ -56,7 +56,7 @@ Examples
 
 ##### proxy with cache in files (for debug with production API with rate limit)
     shell2http -form \
-        /form 'echo "<html><form action=/get><input name=url><input type=submit>"' \
+        /form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
         /get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -s $v_url | tee cache_$MD5)'
 
 ##### remote sound volume control (Mac OS)
