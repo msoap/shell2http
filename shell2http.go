@@ -10,13 +10,14 @@ Install/update:
 Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
-		-host="host" : host for http server, default - all interfaces
-		-port=NNNN   : port for http server, default - 8080
-		-form        : parse query into environment vars
-		-cgi         : set some CGI variables in environment
-		-no-index    : dont generate index page
-		-add-exit    : add /exit command
-		-log=filename: log filename, default - STDOUT
+		-host="host"    : host for http server, default - all interfaces
+		-port=NNNN      : port for http server, default - 8080
+		-form           : parse query into environment vars
+		-cgi            : set some CGI variables in environment
+		-export-vars=var: export environment vars ("VAR1,VAR2,...")
+		-no-index       : dont generate index page
+		-add-exit       : add /exit command
+		-log=filename   : log filename, default - STDOUT
 		-version
 		-help
 
@@ -28,6 +29,7 @@ Examples:
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 	shell2http -form /form 'echo $v_from, $v_to'
 	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+	shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
 More complex examples:
 
@@ -102,12 +104,13 @@ type command struct {
 // ------------------------------------------------------------------
 // config struct
 type config struct {
-	host     string // server host
-	port     int    // server port
-	set_cgi  bool   // set CGI variables
-	set_form bool   // parse form from URL
-	no_index bool   // dont generate index page
-	add_exit bool   // add /exit command
+	host        string // server host
+	port        int    // server port
+	set_cgi     bool   // set CGI variables
+	set_form    bool   // parse form from URL
+	no_index    bool   // dont generate index page
+	add_exit    bool   // add /exit command
+	export_vars string // list of environment vars for export to script
 }
 
 // ------------------------------------------------------------------
@@ -118,6 +121,7 @@ func get_config() (cmd_handlers []command, app_config config, err error) {
 	flag.IntVar(&app_config.port, "port", PORT, "port for http server")
 	flag.StringVar(&app_config.host, "host", "", "host for http server")
 	flag.BoolVar(&app_config.set_cgi, "cgi", false, "set some CGI variables in environment")
+	flag.StringVar(&app_config.export_vars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
 	flag.BoolVar(&app_config.set_form, "form", false, "parse query into environment vars")
 	flag.BoolVar(&app_config.no_index, "no-index", false, "dont generate index page")
 	flag.BoolVar(&app_config.add_exit, "add-exit", false, "add /exit command")
@@ -170,7 +174,7 @@ func setup_handlers(cmd_handlers []command, app_config config) {
 
 			os_exec_command := exec.Command("sh", "-c", cmd)
 
-			proxy_system_env(os_exec_command)
+			proxy_system_env(os_exec_command, app_config)
 			if app_config.set_form {
 				get_form(os_exec_command, req)
 			}
@@ -275,10 +279,16 @@ func get_form(cmd *exec.Cmd, req *http.Request) {
 
 // ------------------------------------------------------------------
 // proxy some system vars
-func proxy_system_env(cmd *exec.Cmd) {
+func proxy_system_env(cmd *exec.Cmd, app_config config) {
+	vars_names := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
+
+	if app_config.export_vars != "" {
+		vars_names = append(vars_names, strings.Split(app_config.export_vars, ",")...)
+	}
+
 	for _, env_raw := range os.Environ() {
 		env := strings.SplitN(env_raw, "=", 2)
-		for _, env_var_name := range [...]string{"PATH", "HOME", "LANG", "USER", "TMPDIR"} {
+		for _, env_var_name := range vars_names {
 			if env[0] == env_var_name {
 				cmd.Env = append(cmd.Env, env_raw)
 			}
