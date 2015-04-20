@@ -30,6 +30,7 @@ Usage
         -cgi            : set some CGI variables in environment
         -export-vars=var: export environment vars ("VAR1,VAR2,...")
                           by default export PATH, HOME, LANG, USER, TMPDIR
+        -export-all-vars: export all current environment vars
         -no-index       : dont generate index page
         -add-exit       : add /exit command
         -log=filename   : log filename, default - STDOUT

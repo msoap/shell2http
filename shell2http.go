@@ -15,6 +15,7 @@ Usage:
 		-form           : parse query into environment vars
 		-cgi            : set some CGI variables in environment
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
+		-export-all-vars: export all current environment vars
 		-no-index       : dont generate index page
 		-add-exit       : add /exit command
 		-log=filename   : log filename, default - STDOUT
@@ -104,13 +105,14 @@ type command struct {
 // ------------------------------------------------------------------
 // config struct
 type config struct {
-	host        string // server host
-	port        int    // server port
-	set_cgi     bool   // set CGI variables
-	set_form    bool   // parse form from URL
-	no_index    bool   // dont generate index page
-	add_exit    bool   // add /exit command
-	export_vars string // list of environment vars for export to script
+	host            string // server host
+	port            int    // server port
+	set_cgi         bool   // set CGI variables
+	set_form        bool   // parse form from URL
+	no_index        bool   // dont generate index page
+	add_exit        bool   // add /exit command
+	export_vars     string // list of environment vars for export to script
+	export_all_vars bool   // export all current environment vars
 }
 
 // ------------------------------------------------------------------
@@ -122,6 +124,7 @@ func get_config() (cmd_handlers []command, app_config config, err error) {
 	flag.StringVar(&app_config.host, "host", "", "host for http server")
 	flag.BoolVar(&app_config.set_cgi, "cgi", false, "set some CGI variables in environment")
 	flag.StringVar(&app_config.export_vars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
+	flag.BoolVar(&app_config.export_all_vars, "export-all-vars", false, "export all current environment vars")
 	flag.BoolVar(&app_config.set_form, "form", false, "parse query into environment vars")
 	flag.BoolVar(&app_config.no_index, "no-index", false, "dont generate index page")
 	flag.BoolVar(&app_config.add_exit, "add-exit", false, "add /exit command")
@@ -288,9 +291,13 @@ func proxy_system_env(cmd *exec.Cmd, app_config config) {
 
 	for _, env_raw := range os.Environ() {
 		env := strings.SplitN(env_raw, "=", 2)
-		for _, env_var_name := range vars_names {
-			if env[0] == env_var_name {
-				cmd.Env = append(cmd.Env, env_raw)
+		if app_config.export_all_vars {
+			cmd.Env = append(cmd.Env, env_raw)
+		} else {
+			for _, env_var_name := range vars_names {
+				if env[0] == env_var_name {
+					cmd.Env = append(cmd.Env, env_raw)
+				}
 			}
 		}
 	}
