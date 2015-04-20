@@ -105,14 +105,14 @@ type Command struct {
 
 // Config - config struct
 type Config struct {
-	host            string // server host
-	port            int    // server port
-	set_cgi         bool   // set CGI variables
-	set_form        bool   // parse form from URL
-	no_index        bool   // dont generate index page
-	add_exit        bool   // add /exit command
-	export_vars     string // list of environment vars for export to script
-	export_all_vars bool   // export all current environment vars
+	host          string // server host
+	port          int    // server port
+	setCGI        bool   // set CGI variables
+	setForm       bool   // parse form from URL
+	noIndex       bool   // dont generate index page
+	addExit       bool   // add /exit command
+	exportVars    string // list of environment vars for export to script
+	exportAllVars bool   // export all current environment vars
 }
 
 // ------------------------------------------------------------------
@@ -122,12 +122,12 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&app_config.port, "port", PORT, "port for http server")
 	flag.StringVar(&app_config.host, "host", "", "host for http server")
-	flag.BoolVar(&app_config.set_cgi, "cgi", false, "set some CGI variables in environment")
-	flag.StringVar(&app_config.export_vars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
-	flag.BoolVar(&app_config.export_all_vars, "export-all-vars", false, "export all current environment vars")
-	flag.BoolVar(&app_config.set_form, "form", false, "parse query into environment vars")
-	flag.BoolVar(&app_config.no_index, "no-index", false, "dont generate index page")
-	flag.BoolVar(&app_config.add_exit, "add-exit", false, "add /exit command")
+	flag.BoolVar(&app_config.setCGI, "cgi", false, "set some CGI variables in environment")
+	flag.StringVar(&app_config.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
+	flag.BoolVar(&app_config.exportAllVars, "export-all-vars", false, "export all current environment vars")
+	flag.BoolVar(&app_config.setForm, "form", false, "parse query into environment vars")
+	flag.BoolVar(&app_config.noIndex, "no-index", false, "dont generate index page")
+	flag.BoolVar(&app_config.addExit, "add-exit", false, "add /exit command")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -178,10 +178,10 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 			os_exec_command := exec.Command("sh", "-c", cmd)
 
 			proxySystemEnv(os_exec_command, app_config)
-			if app_config.set_form {
+			if app_config.setForm {
 				getForm(os_exec_command, req)
 			}
-			if app_config.set_cgi {
+			if app_config.setCGI {
 				setCGIEnv(os_exec_command, req, app_config)
 			}
 
@@ -205,7 +205,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 	}
 
 	// --------------
-	if app_config.add_exit {
+	if app_config.addExit {
 		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET /exit")
 			fmt.Fprint(rw, "Bye...")
@@ -219,7 +219,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 	}
 
 	// --------------
-	if !app_config.no_index {
+	if !app_config.noIndex {
 		index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
 		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 			if req.URL.Path != "/" {
@@ -285,13 +285,13 @@ func getForm(cmd *exec.Cmd, req *http.Request) {
 func proxySystemEnv(cmd *exec.Cmd, app_config Config) {
 	vars_names := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
 
-	if app_config.export_vars != "" {
-		vars_names = append(vars_names, strings.Split(app_config.export_vars, ",")...)
+	if app_config.exportVars != "" {
+		vars_names = append(vars_names, strings.Split(app_config.exportVars, ",")...)
 	}
 
 	for _, env_raw := range os.Environ() {
 		env := strings.SplitN(env_raw, "=", 2)
-		if app_config.export_all_vars {
+		if app_config.exportAllVars {
 			cmd.Env = append(cmd.Env, env_raw)
 		} else {
 			for _, env_var_name := range vars_names {
