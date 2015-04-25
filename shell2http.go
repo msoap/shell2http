@@ -70,11 +70,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
 // version
-const VERSION = 1.2
+const VERSION = 1.3
 
 // default port for http-server
 const PORT = 8080
@@ -175,7 +176,11 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET", path)
 
-			os_exec_command := exec.Command("sh", "-c", cmd)
+			shell, params := "sh", []string{"-c", cmd}
+			if runtime.GOOS == "windows" {
+				shell, params = "cmd", []string{"/C", cmd}
+			}
+			os_exec_command := exec.Command(shell, params...)
 
 			proxySystemEnv(os_exec_command, app_config)
 			if app_config.setForm {

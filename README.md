@@ -10,7 +10,7 @@ By default bind to :8080.
 Install
 -------
 
-Download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/RaspberryPi)
+Download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
 
 From source:
 
