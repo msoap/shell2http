@@ -28,6 +28,7 @@ Usage
         -port=NNNN      : port for http server, default - 8080
         -form           : parse query into environment vars
         -cgi            : set some CGI variables in environment
+                          write POST-data to STDIN (if not set -form)
         -export-vars=var: export environment vars ("VAR1,VAR2,...")
                           by default export PATH, HOME, LANG, USER, TMPDIR
         -export-all-vars: export all current environment vars

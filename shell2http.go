@@ -14,6 +14,7 @@ Usage:
 		-port=NNNN      : port for http server, default - 8080
 		-form           : parse query into environment vars
 		-cgi            : set some CGI variables in environment
+		                  write POST-data to STDIN (if not set -form)
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
 		-export-all-vars: export all current environment vars
 		-no-index       : dont generate index page
@@ -66,6 +67,8 @@ import (
 	"flag"
 	"fmt"
 	"html"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -188,8 +191,28 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 			if app_config.setForm {
 				getForm(os_exec_command, req)
 			}
+
 			if app_config.setCGI {
 				setCGIEnv(os_exec_command, req, app_config)
+
+				// get POST data to stdin of script (if not parse form vars above)
+				if req.Method == "POST" && !app_config.setForm {
+
+					stdin, err := os_exec_command.StdinPipe()
+					if err != nil {
+						log.Println("get STDIN error: ", err)
+						return
+					}
+
+					post_body, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						log.Println("read POST data error: ", err)
+						return
+					}
+
+					io.WriteString(stdin, string(post_body))
+					stdin.Close()
+				}
 			}
 
 			os_exec_command.Stderr = os.Stderr
