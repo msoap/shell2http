@@ -179,7 +179,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
-			log.Println("GET", path)
+			log.Println(req.Method, path)
 
 			shell, params := "sh", []string{"-c", cmd}
 			if runtime.GOOS == "windows" {
