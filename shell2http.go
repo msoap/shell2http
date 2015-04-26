@@ -35,11 +35,19 @@ Examples:
 
 More complex examples:
 
+simple http-proxy server (for logging all URLs)
+	# setup proxy as "http://localhost:8080/"
+	shell2http \
+		-log=/dev/null \
+		-cgi \
+		/ 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -L -s $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
+
 test slow connection
 	# http://localhost:8080/slow?duration=10
 	shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 
 proxy with cache in files (for debug with production API with rate limit)
+	# get "http://localhost:8080/url=http://api.url/"
 	shell2http \
 		-form \
 		/form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
