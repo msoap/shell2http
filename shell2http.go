@@ -171,6 +171,8 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 // setup http handlers
 func setupHandlers(cmd_handlers []Command, app_config Config) {
 	index_li_html := ""
+	exists_root_path := false
+
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
@@ -204,6 +206,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 		}
 
 		http.HandleFunc(path, shell_handler)
+		exists_root_path = exists_root_path || path == "/"
 
 		log.Printf("register: %s (%s)\n", path, cmd)
 		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
@@ -224,7 +227,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 	}
 
 	// --------------
-	if !app_config.noIndex {
+	if !app_config.noIndex && !exists_root_path {
 		index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
 		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 			if req.URL.Path != "/" {
