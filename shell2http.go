@@ -202,25 +202,6 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 
 			if app_config.setCGI {
 				setCGIEnv(os_exec_command, req, app_config)
-
-				// get POST data to stdin of script (if not parse form vars above)
-				if req.Method == "POST" && !app_config.setForm {
-
-					stdin, err := os_exec_command.StdinPipe()
-					if err != nil {
-						log.Println("get STDIN error: ", err)
-						return
-					}
-
-					post_body, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						log.Println("read POST data error: ", err)
-						return
-					}
-
-					io.WriteString(stdin, string(post_body))
-					stdin.Close()
-				}
 			}
 
 			os_exec_command.Stderr = os.Stderr
@@ -302,6 +283,26 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
 
 	for _, row := range CGI_vars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgi_name, row.value))
+	}
+
+	// get POST data to stdin of script (if not parse form vars above)
+	if req.Method == "POST" && !app_config.setForm {
+
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			log.Println("get STDIN error: ", err)
+			return
+		}
+
+		post_body, err := ioutil.ReadAll(req.Body)
+		fmt.Println("post_body:", string(post_body))
+		if err != nil {
+			log.Println("read POST data error: ", err)
+			return
+		}
+
+		io.WriteString(stdin, string(post_body))
+		stdin.Close()
 	}
 }
 
