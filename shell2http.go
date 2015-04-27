@@ -295,7 +295,6 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
 		}
 
 		post_body, err := ioutil.ReadAll(req.Body)
-		fmt.Println("post_body:", string(post_body))
 		if err != nil {
 			log.Println("read POST data error: ", err)
 			return
