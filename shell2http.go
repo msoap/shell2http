@@ -81,6 +81,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -211,7 +212,18 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 				log.Println("exec error: ", err)
 				fmt.Fprint(rw, "exec error: ", err)
 			} else {
-				fmt.Fprint(rw, string(shell_out))
+				out_text := string(shell_out)
+				if app_config.setCGI {
+					headers := map[string]string{}
+					out_text, headers = parseCGIHeaders(out_text)
+					for header_key, header_value := range headers {
+						rw.Header().Set(header_key, header_value)
+						if header_key == "Location" {
+							rw.WriteHeader(302)
+						}
+					}
+				}
+				fmt.Fprint(rw, out_text)
 			}
 
 			return
@@ -303,6 +315,26 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
 		io.WriteString(stdin, string(post_body))
 		stdin.Close()
 	}
+}
+
+// ------------------------------------------------------------------
+// parse headers from script output
+func parseCGIHeaders(shell_out string) (string, map[string]string) {
+	headers_map := map[string]string{}
+	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shell_out, 2)
+	if len(parts) == 2 {
+		re := regexp.MustCompile(`(\S+):\s*(.+)\r?\n?`)
+		headers := re.FindAllStringSubmatch(parts[0], -1)
+		if len(headers) > 0 {
+			for _, header := range headers {
+				headers_map[header[1]] = header[2]
+			}
+			return parts[1], headers_map
+		}
+	}
+
+	// headers dont found, return all text
+	return shell_out, headers_map
 }
 
 // ------------------------------------------------------------------
