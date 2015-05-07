@@ -15,6 +15,7 @@ Usage:
 		-form           : parse query into environment vars
 		-cgi            : set some CGI variables in environment
 		                  write POST-data to STDIN (if not set -form)
+		                  parse headers from script (Location: XXX)
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
 		-export-all-vars: export all current environment vars
 		-no-index       : dont generate index page
@@ -31,6 +32,7 @@ Examples:
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 	shell2http -form /form 'echo $v_from, $v_to'
 	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+	shell2http -cgi /set 'touch file; echo "Location: /\n"'
 	shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
 More complex examples:

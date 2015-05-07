@@ -29,6 +29,7 @@ Usage
         -form           : parse query into environment vars
         -cgi            : set some CGI variables in environment
                           write POST-data to STDIN (if not set -form)
+                          parse headers from script (Location: XXX)
         -export-vars=var: export environment vars ("VAR1,VAR2,...")
                           by default export PATH, HOME, LANG, USER, TMPDIR
         -export-all-vars: export all current environment vars
@@ -53,8 +54,10 @@ Examples
 ##### get URL parameters (http://localhost:8080/form?from=10&to=100)
     shell2http -form /form 'echo $v_from, $v_to'
 
-##### pseudo-CGI scripts
+##### CGI scripts
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+    # redirect
+    shell2http -cgi /set 'touch file; echo "Location: /\n"'
 
 ##### simple http-proxy server (for logging all URLs)
     # setup proxy as "http://localhost:8080/"
