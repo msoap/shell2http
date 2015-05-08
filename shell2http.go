@@ -221,7 +221,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 					for header_key, header_value := range headers {
 						rw.Header().Set(header_key, header_value)
 						if header_key == "Location" {
-							rw.WriteHeader(302)
+							rw.WriteHeader(http.StatusFound)
 						}
 					}
 				}
