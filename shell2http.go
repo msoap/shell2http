@@ -89,7 +89,7 @@ import (
 )
 
 // version
-const VERSION = "1.3"
+const VERSION = "1.4"
 
 // default port for http-server
 const PORT = 8080
