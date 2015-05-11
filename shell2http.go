@@ -89,7 +89,7 @@ import (
 )
 
 // version
-const VERSION = 1.3
+const VERSION = "1.3"
 
 // default port for http-server
 const PORT = 8080
@@ -191,6 +191,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println(req.Method, path)
+			setCommonHeaders(rw)
 
 			shell, params := "sh", []string{"-c", cmd}
 			if runtime.GOOS == "windows" {
@@ -242,6 +243,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 	if app_config.addExit {
 		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET /exit")
+			setCommonHeaders(rw)
 			fmt.Fprint(rw, "Bye...")
 			go os.Exit(0)
 
@@ -256,6 +258,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 	if !app_config.noIndex && !exists_root_path {
 		index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
 		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
+			setCommonHeaders(rw)
 			if req.URL.Path != "/" {
 				log.Println("404")
 				http.NotFound(rw, req)
@@ -381,6 +384,12 @@ func proxySystemEnv(cmd *exec.Cmd, app_config Config) {
 			}
 		}
 	}
+}
+
+// ------------------------------------------------------------------
+// set headers for all handlers
+func setCommonHeaders(rw http.ResponseWriter) {
+	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 }
 
 // ------------------------------------------------------------------
