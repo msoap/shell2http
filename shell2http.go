@@ -13,7 +13,8 @@ Usage:
 		-host="host"    : host for http server, default - all interfaces
 		-port=NNNN      : port for http server, default - 8080
 		-form           : parse query into environment vars
-		-cgi            : set some CGI variables in environment
+		-cgi            : exec as CGI-script
+		                  set environment variables
 		                  write POST-data to STDIN (if not set -form)
 		                  parse headers from script (Location: XXX)
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
@@ -137,7 +138,7 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&app_config.port, "port", PORT, "port for http server")
 	flag.StringVar(&app_config.host, "host", "", "host for http server")
-	flag.BoolVar(&app_config.setCGI, "cgi", false, "set some CGI variables in environment")
+	flag.BoolVar(&app_config.setCGI, "cgi", false, "exec as CGI-script")
 	flag.StringVar(&app_config.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
 	flag.BoolVar(&app_config.exportAllVars, "export-all-vars", false, "export all current environment vars")
 	flag.BoolVar(&app_config.setForm, "form", false, "parse query into environment vars")
