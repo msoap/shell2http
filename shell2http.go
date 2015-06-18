@@ -43,7 +43,7 @@ simple http-proxy server (for logging all URLs)
 	shell2http \
 		-log=/dev/null \
 		-cgi \
-		/ 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -L -s $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
+		/ 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
 
 test slow connection
 	# http://localhost:8080/slow?duration=10
@@ -54,7 +54,7 @@ proxy with cache in files (for debug with production API with rate limit)
 	shell2http \
 		-form \
 		/form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
-		/get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -s $v_url | tee cache_$MD5)'
+		/get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
 
 remote sound volume control (Mac OS)
 	shell2http \
