@@ -50,7 +50,7 @@ test slow connection
 	shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 
 proxy with cache in files (for debug with production API with rate limit)
-	# get "http://localhost:8080/url=http://api.url/"
+	# get "http://localhost:8080/get?url=http://api.url/"
 	shell2http \
 		-form \
 		/form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
