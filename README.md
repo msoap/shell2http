@@ -86,6 +86,8 @@ Examples
     shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
                /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
 
+[More examples](https://github.com/msoap/shell2http/wiki)
+
 See also
 --------
 
