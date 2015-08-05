@@ -45,8 +45,8 @@ Examples
 
     shell2http /top "top -l 1 | head -10"
     shell2http /date date /ps "ps aux"
-    shell2http /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
-    shell2http /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
+    shell2http -export-all-vars /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
+    shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
     shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
 ##### HTML calendar for current year

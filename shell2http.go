@@ -28,8 +28,8 @@ Usage:
 Examples:
 	shell2http /top "top -l 1 | head -10"
 	shell2http /date date /ps "ps aux"
-	shell2http /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
-	shell2http /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
+	shell2http -export-all-vars /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
+	shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 	shell2http -form /form 'echo $v_from, $v_to'
 	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
