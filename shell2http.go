@@ -22,6 +22,7 @@ Usage:
 		-no-index       : dont generate index page
 		-add-exit       : add /exit command
 		-log=filename   : log filename, default - STDOUT
+		-shell="shell"  : shell for execute command, "" - without shell
 		-version
 		-help
 
@@ -132,6 +133,7 @@ type Config struct {
 	addExit       bool   // add /exit command
 	exportVars    string // list of environment vars for export to script
 	exportAllVars bool   // export all current environment vars
+	shell         string // export all current environment vars
 }
 
 // ------------------------------------------------------------------
@@ -147,6 +149,7 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 	flag.BoolVar(&app_config.setForm, "form", false, "parse query into environment vars")
 	flag.BoolVar(&app_config.noIndex, "no-index", false, "dont generate index page")
 	flag.BoolVar(&app_config.addExit, "add-exit", false, "add /exit command")
+	flag.StringVar(&app_config.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -201,6 +204,17 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 			if runtime.GOOS == "windows" {
 				shell, params = "cmd", []string{"/C", cmd}
 			}
+
+			// custom shell
+			if app_config.shell != "sh" {
+				if app_config.shell != "" {
+					shell = app_config.shell
+				} else {
+					cmd_line := regexp.MustCompile(`\s+`).Split(cmd, -1)
+					shell, params = cmd_line[0], cmd_line[1:]
+				}
+			}
+
 			os_exec_command := exec.Command(shell, params...)
 
 			proxySystemEnv(os_exec_command, app_config)

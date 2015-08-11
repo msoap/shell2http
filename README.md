@@ -37,6 +37,7 @@ Usage
         -no-index       : dont generate index page
         -add-exit       : add /exit command
         -log=filename   : log filename, default - STDOUT
+        -shell="shell"  : shell for execute command, "" - without shell
         -version
         -help
 
