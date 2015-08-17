@@ -93,3 +93,4 @@ See also
 --------
 
  * Emergency web server - [spark](https://github.com/rif/spark)
+ * Share your terminal as a web application - [gotty](https://github.com/yudai/gotty)
