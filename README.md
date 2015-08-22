@@ -12,7 +12,7 @@ Install
 
 MacOS:
 
-    brew tap msoap/shell2http
+    brew tap msoap/tools
     brew install shell2http
 
 Or download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
