@@ -7,6 +7,12 @@ Install/update:
 	go get -u github.com/msoap/shell2http
 	ln -s $GOPATH/bin/shell2http ~/bin/shell2http
 
+MacOS install:
+    brew tap msoap/tools
+    brew install shell2http
+    # update:
+    brew update; brew upgrade shell2http
+
 Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
