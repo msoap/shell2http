@@ -10,9 +10,14 @@ By default bind to :8080.
 Install
 -------
 
-Download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
+MacOS:
 
-From source:
+    brew tap msoap/shell2http
+    brew install shell2http
+
+Or download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
+
+Or build from source:
 
     # install Go (brew install go ...)
     # set $GOPATH if needed
