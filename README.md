@@ -101,3 +101,4 @@ See also
 
  * Emergency web server - [spark](https://github.com/rif/spark)
  * Share your terminal as a web application - [gotty](https://github.com/yudai/gotty)
+ * Create Telegram bot from command-line - [shell2telegram](https://github.com/msoap/shell2telegram)
