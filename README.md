@@ -103,3 +103,4 @@ See also
  * Share your terminal as a web application - [gotty](https://github.com/yudai/gotty)
  * Create Telegram bot from command-line - [shell2telegram](https://github.com/msoap/shell2telegram)
  * A http daemon for local development - [devd](https://github.com/cortesi/devd)
+ * Turn any program that uses STDIN/STDOUT into a WebSocket server - [websocketd](https://github.com/joewalnes/websocketd)
