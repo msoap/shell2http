@@ -103,13 +103,15 @@ import (
 	"github.com/koding/cache"
 )
 
-// version
+// VERSION - version
 const VERSION = "1.4"
 
-// default port for http-server
+// PORT - default port for http-server
 const PORT = 8080
 
 // ------------------------------------------------------------------
+
+// INDEX_HTML - Template for index page
 const INDEX_HTML = `<!DOCTYPE html>
 <html>
 <head>
