@@ -47,6 +47,7 @@ Usage
         -add-exit       : add /exit command
         -log=filename   : log filename, default - STDOUT
         -shell="shell"  : shell for execute command, "" - without shell
+        -cache=NNN      : caching command out for NNN seconds
         -version
         -help
 

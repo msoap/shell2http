@@ -29,6 +29,7 @@ Usage:
 		-add-exit       : add /exit command
 		-log=filename   : log filename, default - STDOUT
 		-shell="shell"  : shell for execute command, "" - without shell
+		-cache=NNN      : caching command out for NNN seconds
 		-version
 		-help
 
@@ -97,6 +98,9 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/koding/cache"
 )
 
 // version
@@ -140,6 +144,7 @@ type Config struct {
 	exportVars    string // list of environment vars for export to script
 	exportAllVars bool   // export all current environment vars
 	shell         string // export all current environment vars
+	cache         int    // caching command out (in seconds)
 }
 
 // ------------------------------------------------------------------
@@ -156,6 +161,7 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 	flag.BoolVar(&app_config.noIndex, "no-index", false, "dont generate index page")
 	flag.BoolVar(&app_config.addExit, "add-exit", false, "add /exit command")
 	flag.StringVar(&app_config.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
+	flag.IntVar(&app_config.cache, "cache", 0, "caching command out (in seconds)")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -196,7 +202,7 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setupHandlers(cmd_handlers []Command, app_config Config) {
+func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) {
 	index_li_html := ""
 	exists_root_path := false
 
@@ -204,7 +210,19 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 		path, cmd := row.path, row.cmd
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println(req.Method, path)
+
 			setCommonHeaders(rw)
+
+			if app_config.cache > 0 {
+				cacheData, err := cacheTTL.Get(path)
+				if err != cache.ErrNotFound && err != nil {
+					log.Print(err)
+				} else if err == nil {
+					// cache hit
+					fmt.Fprint(rw, cacheData.(string))
+					return
+				}
+			}
 
 			shell, params := "sh", []string{"-c", cmd}
 			if runtime.GOOS == "windows" {
@@ -251,6 +269,13 @@ func setupHandlers(cmd_handlers []Command, app_config Config) {
 					}
 				}
 				fmt.Fprint(rw, out_text)
+
+				if app_config.cache > 0 {
+					err := cacheTTL.Set(path, out_text)
+					if err != nil {
+						log.Print(err)
+					}
+				}
 			}
 
 			return
@@ -422,7 +447,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	setupHandlers(cmd_handlers, app_config)
+
+	var cacheTTL *cache.MemoryTTL
+	if app_config.cache > 0 {
+		cacheTTL = cache.NewMemoryWithTTL(time.Duration(app_config.cache) * time.Second)
+		cacheTTL.StartGC(time.Duration(app_config.cache) * time.Second * 2)
+	}
+	setupHandlers(cmd_handlers, app_config, cacheTTL)
 
 	adress := fmt.Sprintf("%s:%d", app_config.host, app_config.port)
 	log.Printf("listen http://%s/\n", adress)
