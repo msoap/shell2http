@@ -3,7 +3,7 @@ shell2http
 
 [![GoDoc](https://godoc.org/github.com/msoap/shell2http?status.svg)](https://godoc.org/github.com/msoap/shell2http)
 [![Build Status](https://travis-ci.org/msoap/shell2http.svg?branch=master)](https://travis-ci.org/msoap/shell2http)
-[![Report Card](http://goreportcard.com/badge/github.com/msoap/shell2http)](http://goreportcard.com/report/github.com/msoap/shell2http)
+[![Report Card](https://goreportcard.com/badge/github.com/msoap/shell2http)](https://goreportcard.com/report/github.com/msoap/shell2http)
 
 Executing shell commands via simple http server (written in Go language).
 Settings through 2 command line arguments, path and shell command.
