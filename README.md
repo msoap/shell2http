@@ -48,6 +48,7 @@ Usage
         -log=filename   : log filename, default - STDOUT
         -shell="shell"  : shell for execute command, "" - without shell
         -cache=NNN      : caching command out for NNN seconds
+        -one-thread     : run each shell command in one thread
         -version
         -help
 

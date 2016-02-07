@@ -30,6 +30,7 @@ Usage:
 		-log=filename   : log filename, default - STDOUT
 		-shell="shell"  : shell for execute command, "" - without shell
 		-cache=NNN      : caching command out for NNN seconds
+		-one-thread     : run each shell command in one thread
 		-version
 		-help
 
@@ -98,6 +99,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/koding/cache"
@@ -147,6 +149,7 @@ type Config struct {
 	exportAllVars bool   // export all current environment vars
 	shell         string // export all current environment vars
 	cache         int    // caching command out (in seconds)
+	oneThread     bool   // run each shell commands in one thread
 }
 
 // ------------------------------------------------------------------
@@ -164,6 +167,7 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 	flag.BoolVar(&app_config.addExit, "add-exit", false, "add /exit command")
 	flag.StringVar(&app_config.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
 	flag.IntVar(&app_config.cache, "cache", 0, "caching command out (in seconds)")
+	flag.BoolVar(&app_config.oneThread, "one-thread", false, "run each shell command in one thread")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -210,6 +214,8 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
+		mutex := sync.Mutex{}
+
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			log.Println(req.Method, path)
 
@@ -250,6 +256,11 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 
 			if app_config.setCGI {
 				setCGIEnv(os_exec_command, req, app_config)
+			}
+
+			if app_config.oneThread {
+				mutex.Lock()
+				defer mutex.Unlock()
 			}
 
 			os_exec_command.Stderr = os.Stderr
