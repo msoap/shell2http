@@ -217,7 +217,11 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 		mutex := sync.Mutex{}
 
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
-			log.Printf("%s %s %s \"%s\"", req.RemoteAddr, req.Method, req.RequestURI, req.UserAgent())
+			remoteAddr := req.RemoteAddr
+			if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
+				remoteAddr += ", " + realIP[0]
+			}
+			log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
 
 			setCommonHeaders(rw)
 
