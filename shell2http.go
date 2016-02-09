@@ -347,14 +347,17 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", env_name, header_value[0]))
 	}
 
-	remote_addr := strings.Split(req.RemoteAddr, ":")
+	remote_addr := regexp.MustCompile(`^(.+):(\d+)$`).FindStringSubmatch(req.RemoteAddr)
+	if len(remote_addr) != 3 {
+		remote_addr = []string{"", "", ""}
+	}
 	CGI_vars := [...]struct {
 		cgi_name, value string
 	}{
 		{"PATH_INFO", req.URL.Path},
 		{"QUERY_STRING", req.URL.RawQuery},
-		{"REMOTE_ADDR", remote_addr[0]},
-		{"REMOTE_PORT", remote_addr[1]},
+		{"REMOTE_ADDR", remote_addr[1]},
+		{"REMOTE_PORT", remote_addr[2]},
 		{"REQUEST_METHOD", req.Method},
 		{"REQUEST_URI", req.RequestURI},
 		{"SCRIPT_NAME", req.URL.Path},
