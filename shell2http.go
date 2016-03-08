@@ -209,9 +209,9 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 
 // ------------------------------------------------------------------
 // get default shell and command
-func getShellAndParams(cmd string, customShell string) (shell string, params []string) {
+func getShellAndParams(cmd string, customShell string, isWindows bool) (shell string, params []string) {
 	shell, params = "sh", []string{"-c", cmd}
-	if runtime.GOOS == "windows" {
+	if isWindows {
 		shell, params = "cmd", []string{"/C", cmd}
 	}
 
@@ -239,7 +239,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		mutex := sync.Mutex{}
-		shell, params := getShellAndParams(cmd, app_config.shell)
+		shell, params := getShellAndParams(cmd, app_config.shell, runtime.GOOS == "windows")
 
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			remoteAddr := req.RemoteAddr
