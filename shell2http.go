@@ -103,6 +103,7 @@ import (
 	"time"
 
 	"github.com/koding/cache"
+	"github.com/mattn/go-shellwords"
 )
 
 // VERSION - version
@@ -207,6 +208,29 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 }
 
 // ------------------------------------------------------------------
+// get default shell and command
+func getShellAndParams(cmd string, customShell string) (shell string, params []string) {
+	shell, params = "sh", []string{"-c", cmd}
+	if runtime.GOOS == "windows" {
+		shell, params = "cmd", []string{"/C", cmd}
+	}
+
+	// custom shell
+	switch {
+	case customShell != "sh" && customShell != "":
+		shell = customShell
+	case customShell == "":
+		cmd_line, err := shellwords.Parse(cmd)
+		if err != nil {
+			log.Fatalf("Parse '%s' failed: %s", cmd, err)
+		}
+		shell, params = cmd_line[0], cmd_line[1:]
+	}
+
+	return shell, params
+}
+
+// ------------------------------------------------------------------
 // setup http handlers
 func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) {
 	index_li_html := ""
@@ -215,6 +239,7 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		mutex := sync.Mutex{}
+		shell, params := getShellAndParams(cmd, app_config.shell)
 
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			remoteAddr := req.RemoteAddr
@@ -233,21 +258,6 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 					// cache hit
 					fmt.Fprint(rw, cacheData.(string))
 					return
-				}
-			}
-
-			shell, params := "sh", []string{"-c", cmd}
-			if runtime.GOOS == "windows" {
-				shell, params = "cmd", []string{"/C", cmd}
-			}
-
-			// custom shell
-			if app_config.shell != "sh" {
-				if app_config.shell != "" {
-					shell = app_config.shell
-				} else {
-					cmd_line := regexp.MustCompile(`\s+`).Split(cmd, -1)
-					shell, params = cmd_line[0], cmd_line[1:]
 				}
 			}
 
