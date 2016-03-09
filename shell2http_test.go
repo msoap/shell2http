@@ -40,3 +40,35 @@ func Test_parseCGIHeaders(t *testing.T) {
 		}
 	}
 }
+
+func Test_getShellAndParams(t *testing.T) {
+	shell, params, err := getShellAndParams("ls", "sh", false)
+	if shell != "sh" || !reflect.DeepEqual(params, []string{"-c", "ls"}) || err != nil {
+		t.Errorf("1. getShellAndParams() failed")
+	}
+
+	shell, params, err = getShellAndParams("ls", "sh", true)
+	if shell != "cmd" || !reflect.DeepEqual(params, []string{"/C", "ls"}) || err != nil {
+		t.Errorf("2. getShellAndParams() failed")
+	}
+
+	shell, params, err = getShellAndParams("ls", "bash", false)
+	if shell != "bash" || !reflect.DeepEqual(params, []string{"-c", "ls"}) || err != nil {
+		t.Errorf("3. getShellAndParams() failed")
+	}
+
+	shell, params, err = getShellAndParams("ls -l -a", "", false)
+	if shell != "ls" || !reflect.DeepEqual(params, []string{"-l", "-a"}) || err != nil {
+		t.Errorf("4. getShellAndParams() failed")
+	}
+
+	shell, params, err = getShellAndParams("ls -l 'a b'", "", false)
+	if shell != "ls" || !reflect.DeepEqual(params, []string{"-l", "a b"}) || err != nil {
+		t.Errorf("5. getShellAndParams() failed")
+	}
+
+	shell, params, err = getShellAndParams("ls '-l", "", false)
+	if err == nil {
+		t.Errorf("6. getShellAndParams() failed")
+	}
+}

@@ -209,7 +209,7 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 
 // ------------------------------------------------------------------
 // get default shell and command
-func getShellAndParams(cmd string, customShell string, isWindows bool) (shell string, params []string) {
+func getShellAndParams(cmd string, customShell string, isWindows bool) (shell string, params []string, err error) {
 	shell, params = "sh", []string{"-c", cmd}
 	if isWindows {
 		shell, params = "cmd", []string{"/C", cmd}
@@ -222,24 +222,28 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 	case customShell == "":
 		cmd_line, err := shellwords.Parse(cmd)
 		if err != nil {
-			log.Fatalf("Parse '%s' failed: %s", cmd, err)
+			return shell, params, fmt.Errorf("Parse '%s' failed: %s", cmd, err)
 		}
+
 		shell, params = cmd_line[0], cmd_line[1:]
 	}
 
-	return shell, params
+	return shell, params, nil
 }
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) {
+func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) error {
 	index_li_html := ""
 	exists_root_path := false
 
 	for _, row := range cmd_handlers {
 		path, cmd := row.path, row.cmd
 		mutex := sync.Mutex{}
-		shell, params := getShellAndParams(cmd, app_config.shell, runtime.GOOS == "windows")
+		shell, params, err := getShellAndParams(cmd, app_config.shell, runtime.GOOS == "windows")
+		if err != nil {
+			return err
+		}
 
 		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
 			remoteAddr := req.RemoteAddr
@@ -346,6 +350,8 @@ func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.Me
 			return
 		})
 	}
+
+	return nil
 }
 
 // ------------------------------------------------------------------
@@ -483,7 +489,10 @@ func main() {
 		cacheTTL = cache.NewMemoryWithTTL(time.Duration(app_config.cache) * time.Second)
 		cacheTTL.StartGC(time.Duration(app_config.cache) * time.Second * 2)
 	}
-	setupHandlers(cmd_handlers, app_config, cacheTTL)
+	err = setupHandlers(cmd_handlers, app_config, cacheTTL)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	adress := fmt.Sprintf("%s:%d", app_config.host, app_config.port)
 	log.Printf("listen http://%s/\n", adress)
