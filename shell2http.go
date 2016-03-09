@@ -113,8 +113,8 @@ const PORT = 8080
 
 // ------------------------------------------------------------------
 
-// INDEX_HTML - Template for index page
-const INDEX_HTML = `<!DOCTYPE html>
+// INDEXHTML - Template for index page
+const INDEXHTML = `<!DOCTYPE html>
 <html>
 <head>
 	<title>shell2http</title>
@@ -154,20 +154,20 @@ type Config struct {
 
 // ------------------------------------------------------------------
 // parse arguments
-func getConfig() (cmdHandlers []Command, app_config Config, err error) {
-	var log_filename string
-	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
-	flag.IntVar(&app_config.port, "port", PORT, "port for http server")
-	flag.StringVar(&app_config.host, "host", "", "host for http server")
-	flag.BoolVar(&app_config.setCGI, "cgi", false, "exec as CGI-script")
-	flag.StringVar(&app_config.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
-	flag.BoolVar(&app_config.exportAllVars, "export-all-vars", false, "export all current environment vars")
-	flag.BoolVar(&app_config.setForm, "form", false, "parse query into environment vars")
-	flag.BoolVar(&app_config.noIndex, "no-index", false, "dont generate index page")
-	flag.BoolVar(&app_config.addExit, "add-exit", false, "add /exit command")
-	flag.StringVar(&app_config.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
-	flag.IntVar(&app_config.cache, "cache", 0, "caching command out (in seconds)")
-	flag.BoolVar(&app_config.oneThread, "one-thread", false, "run each shell command in one thread")
+func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
+	var logFilename string
+	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
+	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
+	flag.StringVar(&appConfig.host, "host", "", "host for http server")
+	flag.BoolVar(&appConfig.setCGI, "cgi", false, "exec as CGI-script")
+	flag.StringVar(&appConfig.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
+	flag.BoolVar(&appConfig.exportAllVars, "export-all-vars", false, "export all current environment vars")
+	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars")
+	flag.BoolVar(&appConfig.noIndex, "no-index", false, "dont generate index page")
+	flag.BoolVar(&appConfig.addExit, "add-exit", false, "add /exit command")
+	flag.StringVar(&appConfig.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
+	flag.IntVar(&appConfig.cache, "cache", 0, "caching command out (in seconds)")
+	flag.BoolVar(&appConfig.oneThread, "one-thread", false, "run each shell command in one thread")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -181,12 +181,12 @@ func getConfig() (cmdHandlers []Command, app_config Config, err error) {
 	}
 
 	// setup log file
-	if len(log_filename) > 0 {
-		fh_log, err := os.OpenFile(log_filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if len(logFilename) > 0 {
+		fhLog, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("error opening log file: %v", err)
 		}
-		log.SetOutput(fh_log)
+		log.SetOutput(fhLog)
 	}
 
 	// need >= 2 arguments and count of it must be even
@@ -203,7 +203,7 @@ func getConfig() (cmdHandlers []Command, app_config Config, err error) {
 		cmdHandlers = append(cmdHandlers, Command{path: path, cmd: cmd})
 	}
 
-	return cmdHandlers, app_config, nil
+	return cmdHandlers, appConfig, nil
 }
 
 // ------------------------------------------------------------------
@@ -219,12 +219,12 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 	case customShell != "sh" && customShell != "":
 		shell = customShell
 	case customShell == "":
-		cmd_line, err := shellwords.Parse(cmd)
+		cmdLine, err := shellwords.Parse(cmd)
 		if err != nil {
 			return shell, params, fmt.Errorf("Parse '%s' failed: %s", cmd, err)
 		}
 
-		shell, params = cmd_line[0], cmd_line[1:]
+		shell, params = cmdLine[0], cmdLine[1:]
 	}
 
 	return shell, params, nil
@@ -232,19 +232,19 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) error {
-	index_li_html := ""
-	exists_root_path := false
+func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) error {
+	indexLiHTML := ""
+	existsRootPath := false
 
 	for _, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
 		mutex := sync.Mutex{}
-		shell, params, err := getShellAndParams(cmd, app_config.shell, runtime.GOOS == "windows")
+		shell, params, err := getShellAndParams(cmd, appConfig.shell, runtime.GOOS == "windows")
 		if err != nil {
 			return err
 		}
 
-		shell_handler := func(rw http.ResponseWriter, req *http.Request) {
+		shellHandler := func(rw http.ResponseWriter, req *http.Request) {
 			remoteAddr := req.RemoteAddr
 			if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
 				remoteAddr += ", " + realIP[0]
@@ -253,7 +253,7 @@ func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.Mem
 
 			setCommonHeaders(rw)
 
-			if app_config.cache > 0 {
+			if appConfig.cache > 0 {
 				cacheData, err := cacheTTL.Get(path)
 				if err != cache.ErrNotFound && err != nil {
 					log.Print(err)
@@ -264,44 +264,44 @@ func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.Mem
 				}
 			}
 
-			os_exec_command := exec.Command(shell, params...)
+			osExecCommand := exec.Command(shell, params...)
 
-			proxySystemEnv(os_exec_command, app_config)
-			if app_config.setForm {
-				getForm(os_exec_command, req)
+			proxySystemEnv(osExecCommand, appConfig)
+			if appConfig.setForm {
+				getForm(osExecCommand, req)
 			}
 
-			if app_config.setCGI {
-				setCGIEnv(os_exec_command, req, app_config)
+			if appConfig.setCGI {
+				setCGIEnv(osExecCommand, req, appConfig)
 			}
 
-			if app_config.oneThread {
+			if appConfig.oneThread {
 				mutex.Lock()
 				defer mutex.Unlock()
 			}
 
-			os_exec_command.Stderr = os.Stderr
-			shell_out, err := os_exec_command.Output()
+			osExecCommand.Stderr = os.Stderr
+			shellOut, err := osExecCommand.Output()
 
 			if err != nil {
 				log.Println("exec error: ", err)
 				fmt.Fprint(rw, "exec error: ", err)
 			} else {
-				out_text := string(shell_out)
-				if app_config.setCGI {
+				outText := string(shellOut)
+				if appConfig.setCGI {
 					headers := map[string]string{}
-					out_text, headers = parseCGIHeaders(out_text)
-					for header_key, header_value := range headers {
-						rw.Header().Set(header_key, header_value)
-						if header_key == "Location" {
+					outText, headers = parseCGIHeaders(outText)
+					for headerKey, headerValue := range headers {
+						rw.Header().Set(headerKey, headerValue)
+						if headerKey == "Location" {
 							rw.WriteHeader(http.StatusFound)
 						}
 					}
 				}
-				fmt.Fprint(rw, out_text)
+				fmt.Fprint(rw, outText)
 
-				if app_config.cache > 0 {
-					err := cacheTTL.Set(path, out_text)
+				if appConfig.cache > 0 {
+					err := cacheTTL.Set(path, outText)
 					if err != nil {
 						log.Print(err)
 					}
@@ -311,15 +311,15 @@ func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.Mem
 			return
 		}
 
-		http.HandleFunc(path, shell_handler)
-		exists_root_path = exists_root_path || path == "/"
+		http.HandleFunc(path, shellHandler)
+		existsRootPath = existsRootPath || path == "/"
 
 		log.Printf("register: %s (%s)\n", path, cmd)
-		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
 	}
 
 	// --------------
-	if app_config.addExit {
+	if appConfig.addExit {
 		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
 			log.Println("GET /exit")
 			setCommonHeaders(rw)
@@ -330,12 +330,12 @@ func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.Mem
 		})
 
 		log.Printf("register: %s (%s)\n", "/exit", "/exit")
-		index_li_html += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, "/exit", "/exit")
+		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, "/exit", "/exit")
 	}
 
 	// --------------
-	if !app_config.noIndex && !exists_root_path {
-		index_html := fmt.Sprintf(INDEX_HTML, index_li_html)
+	if !appConfig.noIndex && !existsRootPath {
+		indexHTML := fmt.Sprintf(INDEXHTML, indexLiHTML)
 		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 			setCommonHeaders(rw)
 			if req.URL.Path != "/" {
@@ -344,7 +344,7 @@ func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.Mem
 				return
 			}
 			log.Println("GET /")
-			fmt.Fprint(rw, index_html)
+			fmt.Fprint(rw, indexHTML)
 
 			return
 		})
@@ -355,39 +355,39 @@ func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.Mem
 
 // ------------------------------------------------------------------
 // set some CGI variables
-func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
+func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// set HTTP_* variables
-	for header_name, header_value := range req.Header {
-		env_name := strings.ToUpper(strings.Replace(header_name, "-", "_", -1))
-		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", env_name, header_value[0]))
+	for headerName, headerValue := range req.Header {
+		envName := strings.ToUpper(strings.Replace(headerName, "-", "_", -1))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, headerValue[0]))
 	}
 
-	remote_addr := regexp.MustCompile(`^(.+):(\d+)$`).FindStringSubmatch(req.RemoteAddr)
-	if len(remote_addr) != 3 {
-		remote_addr = []string{"", "", ""}
+	remoteAddr := regexp.MustCompile(`^(.+):(\d+)$`).FindStringSubmatch(req.RemoteAddr)
+	if len(remoteAddr) != 3 {
+		remoteAddr = []string{"", "", ""}
 	}
-	CGI_vars := [...]struct {
-		cgi_name, value string
+	CGIVars := [...]struct {
+		cgiName, value string
 	}{
 		{"PATH_INFO", req.URL.Path},
 		{"QUERY_STRING", req.URL.RawQuery},
-		{"REMOTE_ADDR", remote_addr[1]},
-		{"REMOTE_PORT", remote_addr[2]},
+		{"REMOTE_ADDR", remoteAddr[1]},
+		{"REMOTE_PORT", remoteAddr[2]},
 		{"REQUEST_METHOD", req.Method},
 		{"REQUEST_URI", req.RequestURI},
 		{"SCRIPT_NAME", req.URL.Path},
-		{"SERVER_NAME", app_config.host},
-		{"SERVER_PORT", fmt.Sprintf("%d", app_config.port)},
+		{"SERVER_NAME", appConfig.host},
+		{"SERVER_PORT", fmt.Sprintf("%d", appConfig.port)},
 		{"SERVER_PROTOCOL", req.Proto},
 		{"SERVER_SOFTWARE", "shell2http"},
 	}
 
-	for _, row := range CGI_vars {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgi_name, row.value))
+	for _, row := range CGIVars {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgiName, row.value))
 	}
 
 	// get POST data to stdin of script (if not parse form vars above)
-	if req.Method == "POST" && !app_config.setForm {
+	if req.Method == "POST" && !appConfig.setForm {
 
 		stdin, err := cmd.StdinPipe()
 		if err != nil {
@@ -395,13 +395,13 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
 			return
 		}
 
-		post_body, err := ioutil.ReadAll(req.Body)
+		postBody, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			log.Println("read POST data error: ", err)
 			return
 		}
 
-		stdin.Write(post_body)
+		stdin.Write(postBody)
 		stdin.Close()
 	}
 }
@@ -415,22 +415,22 @@ Header-name2: value2\n
 text
 
 */
-func parseCGIHeaders(shell_out string) (string, map[string]string) {
-	headers_map := map[string]string{}
-	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shell_out, 2)
+func parseCGIHeaders(shellOut string) (string, map[string]string) {
+	headersMap := map[string]string{}
+	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shellOut, 2)
 	if len(parts) == 2 {
 		re := regexp.MustCompile(`(\S+):\s*(.+)\r?\n?`)
 		headers := re.FindAllStringSubmatch(parts[0], -1)
 		if len(headers) > 0 {
 			for _, header := range headers {
-				headers_map[header[1]] = header[2]
+				headersMap[header[1]] = header[2]
 			}
-			return parts[1], headers_map
+			return parts[1], headersMap
 		}
 	}
 
 	// headers dont found, return all text
-	return shell_out, headers_map
+	return shellOut, headersMap
 }
 
 // ------------------------------------------------------------------
@@ -449,21 +449,21 @@ func getForm(cmd *exec.Cmd, req *http.Request) {
 
 // ------------------------------------------------------------------
 // proxy some system vars
-func proxySystemEnv(cmd *exec.Cmd, app_config Config) {
-	vars_names := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
+func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
+	varsNames := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
 
-	if app_config.exportVars != "" {
-		vars_names = append(vars_names, strings.Split(app_config.exportVars, ",")...)
+	if appConfig.exportVars != "" {
+		varsNames = append(varsNames, strings.Split(appConfig.exportVars, ",")...)
 	}
 
-	for _, env_raw := range os.Environ() {
-		env := strings.SplitN(env_raw, "=", 2)
-		if app_config.exportAllVars {
-			cmd.Env = append(cmd.Env, env_raw)
+	for _, envRaw := range os.Environ() {
+		env := strings.SplitN(envRaw, "=", 2)
+		if appConfig.exportAllVars {
+			cmd.Env = append(cmd.Env, envRaw)
 		} else {
-			for _, env_var_name := range vars_names {
-				if env[0] == env_var_name {
-					cmd.Env = append(cmd.Env, env_raw)
+			for _, envVarName := range varsNames {
+				if env[0] == envVarName {
+					cmd.Env = append(cmd.Env, envRaw)
 				}
 			}
 		}
@@ -478,22 +478,22 @@ func setCommonHeaders(rw http.ResponseWriter) {
 
 // ------------------------------------------------------------------
 func main() {
-	cmdHandlers, app_config, err := getConfig()
+	cmdHandlers, appConfig, err := getConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var cacheTTL *cache.MemoryTTL
-	if app_config.cache > 0 {
-		cacheTTL = cache.NewMemoryWithTTL(time.Duration(app_config.cache) * time.Second)
-		cacheTTL.StartGC(time.Duration(app_config.cache) * time.Second * 2)
+	if appConfig.cache > 0 {
+		cacheTTL = cache.NewMemoryWithTTL(time.Duration(appConfig.cache) * time.Second)
+		cacheTTL.StartGC(time.Duration(appConfig.cache) * time.Second * 2)
 	}
-	err = setupHandlers(cmdHandlers, app_config, cacheTTL)
+	err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	adress := fmt.Sprintf("%s:%d", app_config.host, app_config.port)
+	adress := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
 	log.Printf("listen http://%s/\n", adress)
 	err = http.ListenAndServe(adress, nil)
 	if err != nil {
