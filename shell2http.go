@@ -155,7 +155,7 @@ type Config struct {
 
 // ------------------------------------------------------------------
 // parse arguments
-func getConfig() (cmd_handlers []Command, app_config Config, err error) {
+func getConfig() (cmdHandlers []Command, app_config Config, err error) {
 	var log_filename string
 	flag.StringVar(&log_filename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&app_config.port, "port", PORT, "port for http server")
@@ -201,10 +201,10 @@ func getConfig() (cmd_handlers []Command, app_config Config, err error) {
 		if path[0] != '/' {
 			return nil, Config{}, fmt.Errorf("error: path %s dont starts with /", path)
 		}
-		cmd_handlers = append(cmd_handlers, Command{path: path, cmd: cmd})
+		cmdHandlers = append(cmdHandlers, Command{path: path, cmd: cmd})
 	}
 
-	return cmd_handlers, app_config, nil
+	return cmdHandlers, app_config, nil
 }
 
 // ------------------------------------------------------------------
@@ -233,11 +233,11 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 
 // ------------------------------------------------------------------
 // setup http handlers
-func setupHandlers(cmd_handlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) error {
+func setupHandlers(cmdHandlers []Command, app_config Config, cacheTTL *cache.MemoryTTL) error {
 	index_li_html := ""
 	exists_root_path := false
 
-	for _, row := range cmd_handlers {
+	for _, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
 		mutex := sync.Mutex{}
 		shell, params, err := getShellAndParams(cmd, app_config.shell, runtime.GOOS == "windows")
@@ -479,7 +479,7 @@ func setCommonHeaders(rw http.ResponseWriter) {
 
 // ------------------------------------------------------------------
 func main() {
-	cmd_handlers, app_config, err := getConfig()
+	cmdHandlers, app_config, err := getConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func main() {
 		cacheTTL = cache.NewMemoryWithTTL(time.Duration(app_config.cache) * time.Second)
 		cacheTTL.StartGC(time.Duration(app_config.cache) * time.Second * 2)
 	}
-	err = setupHandlers(cmd_handlers, app_config, cacheTTL)
+	err = setupHandlers(cmdHandlers, app_config, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
 	}
