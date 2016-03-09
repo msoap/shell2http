@@ -231,6 +231,81 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 }
 
 // ------------------------------------------------------------------
+// getShellHandler - get handler function for one shell command
+func getShellHandler(appConfig Config, path string, shell string, params []string, cacheTTL *cache.MemoryTTL) func(http.ResponseWriter, *http.Request) {
+	mutex := sync.Mutex{}
+
+	shellHandler := func(rw http.ResponseWriter, req *http.Request) {
+		remoteAddr := req.RemoteAddr
+		if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
+			remoteAddr += ", " + realIP[0]
+		}
+		log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
+
+		setCommonHeaders(rw)
+
+		if appConfig.cache > 0 {
+			cacheData, err := cacheTTL.Get(path)
+			if err != cache.ErrNotFound && err != nil {
+				log.Print(err)
+			} else if err == nil {
+				// cache hit
+				fmt.Fprint(rw, cacheData.(string))
+				return
+			}
+		}
+
+		osExecCommand := exec.Command(shell, params...)
+
+		proxySystemEnv(osExecCommand, appConfig)
+		if appConfig.setForm {
+			getForm(osExecCommand, req)
+		}
+
+		if appConfig.setCGI {
+			setCGIEnv(osExecCommand, req, appConfig)
+		}
+
+		if appConfig.oneThread {
+			mutex.Lock()
+			defer mutex.Unlock()
+		}
+
+		osExecCommand.Stderr = os.Stderr
+		shellOut, err := osExecCommand.Output()
+
+		if err != nil {
+			log.Println("exec error: ", err)
+			fmt.Fprint(rw, "exec error: ", err)
+		} else {
+			outText := string(shellOut)
+			if appConfig.setCGI {
+				headers := map[string]string{}
+				outText, headers = parseCGIHeaders(outText)
+				for headerKey, headerValue := range headers {
+					rw.Header().Set(headerKey, headerValue)
+					if headerKey == "Location" {
+						rw.WriteHeader(http.StatusFound)
+					}
+				}
+			}
+			fmt.Fprint(rw, outText)
+
+			if appConfig.cache > 0 {
+				err := cacheTTL.Set(path, outText)
+				if err != nil {
+					log.Print(err)
+				}
+			}
+		}
+
+		return
+	}
+
+	return shellHandler
+}
+
+// ------------------------------------------------------------------
 // setup http handlers
 func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) error {
 	indexLiHTML := ""
@@ -238,80 +313,12 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 
 	for _, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
-		mutex := sync.Mutex{}
 		shell, params, err := getShellAndParams(cmd, appConfig.shell, runtime.GOOS == "windows")
 		if err != nil {
 			return err
 		}
 
-		shellHandler := func(rw http.ResponseWriter, req *http.Request) {
-			remoteAddr := req.RemoteAddr
-			if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
-				remoteAddr += ", " + realIP[0]
-			}
-			log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
-
-			setCommonHeaders(rw)
-
-			if appConfig.cache > 0 {
-				cacheData, err := cacheTTL.Get(path)
-				if err != cache.ErrNotFound && err != nil {
-					log.Print(err)
-				} else if err == nil {
-					// cache hit
-					fmt.Fprint(rw, cacheData.(string))
-					return
-				}
-			}
-
-			osExecCommand := exec.Command(shell, params...)
-
-			proxySystemEnv(osExecCommand, appConfig)
-			if appConfig.setForm {
-				getForm(osExecCommand, req)
-			}
-
-			if appConfig.setCGI {
-				setCGIEnv(osExecCommand, req, appConfig)
-			}
-
-			if appConfig.oneThread {
-				mutex.Lock()
-				defer mutex.Unlock()
-			}
-
-			osExecCommand.Stderr = os.Stderr
-			shellOut, err := osExecCommand.Output()
-
-			if err != nil {
-				log.Println("exec error: ", err)
-				fmt.Fprint(rw, "exec error: ", err)
-			} else {
-				outText := string(shellOut)
-				if appConfig.setCGI {
-					headers := map[string]string{}
-					outText, headers = parseCGIHeaders(outText)
-					for headerKey, headerValue := range headers {
-						rw.Header().Set(headerKey, headerValue)
-						if headerKey == "Location" {
-							rw.WriteHeader(http.StatusFound)
-						}
-					}
-				}
-				fmt.Fprint(rw, outText)
-
-				if appConfig.cache > 0 {
-					err := cacheTTL.Set(path, outText)
-					if err != nil {
-						log.Print(err)
-					}
-				}
-			}
-
-			return
-		}
-
-		http.HandleFunc(path, shellHandler)
+		http.HandleFunc(path, getShellHandler(appConfig, path, shell, params, cacheTTL))
 		existsRootPath = existsRootPath || path == "/"
 
 		log.Printf("register: %s (%s)\n", path, cmd)
