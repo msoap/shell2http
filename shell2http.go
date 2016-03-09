@@ -90,7 +90,6 @@ import (
 	"flag"
 	"fmt"
 	"html"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -402,7 +401,7 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, app_config Config) {
 			return
 		}
 
-		io.WriteString(stdin, string(post_body))
+		stdin.Write(post_body)
 		stdin.Close()
 	}
 }
