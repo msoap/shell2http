@@ -53,11 +53,6 @@ func Test_getShellAndParams(t *testing.T) {
 		t.Errorf("1. getShellAndParams() failed")
 	}
 
-	shell, params, err = getShellAndParams("ls", "sh", true)
-	if shell != "cmd" || !reflect.DeepEqual(params, []string{"/C", "ls"}) || err != nil {
-		t.Errorf("2. getShellAndParams() failed")
-	}
-
 	shell, params, err = getShellAndParams("ls", "bash", false)
 	if shell != "bash" || !reflect.DeepEqual(params, []string{"-c", "ls"}) || err != nil {
 		t.Errorf("3. getShellAndParams() failed")
@@ -76,6 +71,13 @@ func Test_getShellAndParams(t *testing.T) {
 	shell, params, err = getShellAndParams("ls '-l", "", false)
 	if err == nil {
 		t.Errorf("6. getShellAndParams() failed")
+	}
+}
+
+func Test_getShellAndParams_windows(t *testing.T) {
+	shell, params, err := getShellAndParams("ls", "sh", true)
+	if shell != "cmd" || !reflect.DeepEqual(params, []string{"/C", "ls"}) || err != nil {
+		t.Errorf("2. getShellAndParams() failed")
 	}
 }
 
