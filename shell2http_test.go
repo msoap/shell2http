@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -78,8 +79,20 @@ func Test_getShellAndParams(t *testing.T) {
 	}
 }
 
-func httpGet(url string) ([]byte, error) {
-	res, err := http.Get(url)
+func httpRequest(method string, url string, postData string) ([]byte, error) {
+	var postDataReader io.Reader
+	if method == "POST" && len(postData) > 0 {
+		postDataReader = strings.NewReader(postData)
+	}
+
+	request, err := http.NewRequest(method, url, postDataReader)
+	if err != nil {
+		return nil, err
+	}
+
+	request.Header.Set("X-Real-Ip", "127.0.0.1")
+	client := &http.Client{}
+	res, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -101,34 +114,77 @@ func getFreePort() string {
 	return parts[len(parts)-1]
 }
 
-func Test_main1(t *testing.T) {
+func testHTTP(t *testing.T, method, url, postData string, fn func(body string) bool, message string) {
+	res, err := httpRequest(method, url, postData)
+	if err != nil {
+		t.Errorf("%s, get %s failed: %s", message, url, err)
+	}
+	if !fn(string(res)) {
+		t.Errorf("%s failed", message)
+	}
+}
+
+func Test_main(t *testing.T) {
 	port := getFreePort()
 	os.Args = []string{"shell2http",
 		"-add-exit",
 		"-cache=1",
 		"-cgi",
 		"-export-all-vars",
-		"-form",
+		"-export-vars=HOME",
 		"-one-thread",
-		"-shell=bash",
+		"-shell=",
 		"-log=/dev/null",
 		"-port=" + port,
-		"/echo", "echo 123"}
+		"/echo", "echo 123",
+		"/form", "echo var=$v_var",
+		"/error", "/ not exists cmd",
+		"/post", "cat",
+		"/redirect", `echo "Location: /` + "\n" + `"`,
+	}
 	go main()
 
-	res, err := httpGet("http://localhost:" + port + "/")
+	// hide stderr
+	oldStderr := os.Stderr // keep backup of the real stderr
+	newStderr, err := os.Open("/dev/null")
 	if err != nil {
-		t.Errorf("1. main() failed: %s", err)
+		t.Errorf("open /dev/null: %s", err)
 	}
-	if len(res) == 0 || !strings.HasPrefix(string(res), "<!DOCTYPE html>") {
-		t.Errorf("1. main() failed: real result: '%s'", string(res))
-	}
+	os.Stderr = newStderr
+	defer func() { os.Stderr = oldStderr; newStderr.Close() }()
 
-	res, err = httpGet("http://localhost:" + port + "/echo")
-	if err != nil {
-		t.Errorf("2. main() failed: %s", err)
-	}
-	if string(res) != "123\n" {
-		t.Errorf("2. main() failed: real result: '%s'", string(res))
-	}
+	testHTTP(t, "GET", "http://localhost:"+port+"/", "",
+		func(res string) bool { return len(res) > 0 && strings.HasPrefix(res, "<!DOCTYPE html>") },
+		"1. get /",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/echo", "",
+		func(res string) bool { return res == "123\n" },
+		"2. echo",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/echo", "",
+		func(res string) bool { return res == "123\n" },
+		"3. echo from cache",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/404", "",
+		func(res string) bool { return strings.HasPrefix(res, "404 page not found") },
+		"4. 404",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/error", "",
+		func(res string) bool { return strings.HasPrefix(res, "exec error:") },
+		"5. error",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/redirect", "",
+		func(res string) bool { return strings.HasPrefix(res, "<!DOCTYPE html>") },
+		"6. redirect",
+	)
+
+	testHTTP(t, "POST", "http://localhost:"+port+"/post", "X-header: value\n\ntext",
+		func(res string) bool { return strings.HasPrefix(res, "text") },
+		"7. POST",
+	)
 }
