@@ -132,7 +132,7 @@ func Test_main(t *testing.T) {
 		"-add-exit",
 		"-cache=1",
 		"-cgi",
-		"-export-all-vars",
+		// "-export-all-vars",
 		"-export-vars=HOME",
 		"-one-thread",
 		"-shell=",
