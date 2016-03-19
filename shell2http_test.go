@@ -68,7 +68,7 @@ func Test_getShellAndParams(t *testing.T) {
 		t.Errorf("5. getShellAndParams() failed")
 	}
 
-	shell, params, err = getShellAndParams("ls '-l", "", false)
+	_, _, err = getShellAndParams("ls '-l", "", false)
 	if err == nil {
 		t.Errorf("6. getShellAndParams() failed")
 	}
