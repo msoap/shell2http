@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Test_parseCGIHeaders(t *testing.T) {
@@ -145,6 +146,7 @@ func Test_main(t *testing.T) {
 		"/redirect", `echo "Location: /` + "\n" + `"`,
 	}
 	go main()
+	time.Sleep(100 * time.Millisecond) // wait for up http server
 
 	// hide stderr
 	oldStderr := os.Stderr // keep backup of the real stderr
