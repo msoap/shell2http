@@ -35,3 +35,10 @@ sha1-zip:
 
 clean:
 	rm shell2http*.zip
+
+test:
+	go test -race -cover -v ./...
+
+lint:
+	golint ./...
+	go vet ./...
