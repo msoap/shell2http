@@ -404,12 +404,21 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 
 		postBody, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			log.Println("read POST data error: ", err)
+			log.Printf("read POST data error: %s", err)
 			return
 		}
 
-		stdin.Write(postBody)
-		stdin.Close()
+		_, err = stdin.Write(postBody)
+		if err != nil {
+			log.Printf("Write to STDIN error: %s", err)
+			return
+		}
+
+		err = stdin.Close()
+		if err != nil {
+			log.Printf("Close STDIN error: %s", err)
+			return
+		}
 	}
 }
 
