@@ -101,7 +101,11 @@ func httpRequest(method string, url string, postData string) ([]byte, error) {
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
-	defer res.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -109,10 +113,13 @@ func httpRequest(method string, url string, postData string) ([]byte, error) {
 	return body, nil
 }
 
-func getFreePort() string {
+func getFreePort(t *testing.T) string {
 	listen, _ := net.Listen("tcp", ":0")
-	defer listen.Close()
 	parts := strings.Split(listen.Addr().String(), ":")
+	err := listen.Close()
+	if err != nil {
+		t.Errorf("getFreePort() failed")
+	}
 
 	return parts[len(parts)-1]
 }
@@ -128,7 +135,7 @@ func testHTTP(t *testing.T, method, url, postData string, fn func(body string) b
 }
 
 func Test_main(t *testing.T) {
-	port := getFreePort()
+	port := getFreePort(t)
 	os.Args = []string{"shell2http",
 		"-add-exit",
 		"-cache=1",
@@ -155,7 +162,13 @@ func Test_main(t *testing.T) {
 		t.Errorf("open /dev/null: %s", err)
 	}
 	os.Stderr = newStderr
-	defer func() { os.Stderr = oldStderr; newStderr.Close() }()
+	defer func() {
+		os.Stderr = oldStderr
+		err := newStderr.Close()
+		if err != nil {
+			t.Errorf("Stderr Close failed: %s", err)
+		}
+	}()
 
 	testHTTP(t, "GET", "http://localhost:"+port+"/", "",
 		func(res string) bool { return len(res) > 0 && strings.HasPrefix(res, "<!DOCTYPE html>") },
