@@ -90,6 +90,7 @@ import (
 	"flag"
 	"fmt"
 	"html"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -396,30 +397,39 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// get POST data to stdin of script (if not parse form vars above)
 	if req.Method == "POST" && !appConfig.setForm {
 
-		stdin, err := cmd.StdinPipe()
+		var (
+			stdin    io.WriteCloser
+			postBody []byte
+		)
+		err := errChain(func() (err error) {
+			stdin, err = cmd.StdinPipe()
+			return err
+		}, func() (err error) {
+			postBody, err = ioutil.ReadAll(req.Body)
+			return err
+		}, func() error {
+			_, err := stdin.Write(postBody)
+			return err
+		}, func() error {
+			return stdin.Close()
+		})
 		if err != nil {
 			log.Println("get STDIN error: ", err)
 			return
 		}
 
-		postBody, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			log.Printf("read POST data error: %s", err)
-			return
-		}
+	}
+}
 
-		_, err = stdin.Write(postBody)
-		if err != nil {
-			log.Printf("Write to STDIN error: %s", err)
-			return
-		}
-
-		err = stdin.Close()
-		if err != nil {
-			log.Printf("Close STDIN error: %s", err)
-			return
+// errChain - handle errors on few functions
+func errChain(chainFuncs ...func() error) error {
+	for _, fn := range chainFuncs {
+		if err := fn(); err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 // ------------------------------------------------------------------
