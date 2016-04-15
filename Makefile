@@ -1,3 +1,6 @@
+run:
+	go run shell2http.go -add-exit -cgi /date date /env 'printenv | sort'
+
 build:
 	go build shell2http.go
 
