@@ -232,17 +232,22 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 }
 
 // ------------------------------------------------------------------
+// printAccessLogLine - out one line of access log
+func printAccessLogLine(req *http.Request) {
+	remoteAddr := req.RemoteAddr
+	if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
+		remoteAddr += ", " + realIP[0]
+	}
+	log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
+}
+
+// ------------------------------------------------------------------
 // getShellHandler - get handler function for one shell command
 func getShellHandler(appConfig Config, path string, shell string, params []string, cacheTTL *cache.MemoryTTL) func(http.ResponseWriter, *http.Request) {
 	mutex := sync.Mutex{}
 
 	shellHandler := func(rw http.ResponseWriter, req *http.Request) {
-		remoteAddr := req.RemoteAddr
-		if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
-			remoteAddr += ", " + realIP[0]
-		}
-		log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
-
+		printAccessLogLine(req)
 		setCommonHeaders(rw)
 
 		if appConfig.cache > 0 {
@@ -329,7 +334,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 	// --------------
 	if appConfig.addExit {
 		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
-			log.Println("GET /exit")
+			printAccessLogLine(req)
 			setCommonHeaders(rw)
 			fmt.Fprint(rw, "Bye...")
 			go os.Exit(0)
@@ -347,11 +352,11 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 			setCommonHeaders(rw)
 			if req.URL.Path != "/" {
-				log.Println("404")
+				log.Printf("404: %s", req.URL.Path)
 				http.NotFound(rw, req)
 				return
 			}
-			log.Println("GET /")
+			printAccessLogLine(req)
 			fmt.Fprint(rw, indexHTML)
 
 			return
