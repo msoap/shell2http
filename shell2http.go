@@ -372,6 +372,9 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// set HTTP_* variables
 	for headerName, headerValue := range req.Header {
 		envName := strings.ToUpper(strings.Replace(headerName, "-", "_", -1))
+		if envName == "PROXY" {
+			continue
+		}
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, headerValue[0]))
 	}
 
