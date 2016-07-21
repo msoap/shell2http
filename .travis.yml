@@ -1,9 +1,13 @@
 language: go
 sudo: false
 
+env:
+  global:
+    - CURRENT_GO_VERSION="1.6.3"
+
 go:
-  - 1.5.3
-  - 1.6.2
+  - 1.5.4
+  - 1.6.3
   - tip
 
 before_install:
@@ -15,8 +19,10 @@ install: go get -t ./...
 
 script:
   - go test -v ./...
-  - if [ "$TRAVIS_GO_VERSION" = "1.6.2" ]; then go test -race -v ./...; fi
+  - if [ "$TRAVIS_GO_VERSION" = "$CURRENT_GO_VERSION" ]; then go test -race -v ./...; fi
   - go vet ./...
   - errcheck ./...
   - diff <(gofmt -d .) <(echo -n "")
-  - if [ "$TRAVIS_GO_VERSION" = "1.6.2" ]; then $HOME/gopath/bin/goveralls -service=travis-ci || true; fi
+  - if [ "$TRAVIS_GO_VERSION" = "$CURRENT_GO_VERSION" ]; then
+      $HOME/gopath/bin/goveralls -service=travis-ci || true;
+    fi
