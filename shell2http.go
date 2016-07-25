@@ -142,16 +142,16 @@ type Command struct {
 
 // Config - config struct
 type Config struct {
-	host          string // server host
 	port          int    // server port
+	cache         int    // caching command out (in seconds)
+	host          string // server host
+	exportVars    string // list of environment vars for export to script
+	shell         string // export all current environment vars
+	exportAllVars bool   // export all current environment vars
 	setCGI        bool   // set CGI variables
 	setForm       bool   // parse form from URL
 	noIndex       bool   // dont generate index page
 	addExit       bool   // add /exit command
-	exportVars    string // list of environment vars for export to script
-	exportAllVars bool   // export all current environment vars
-	shell         string // export all current environment vars
-	cache         int    // caching command out (in seconds)
 	oneThread     bool   // run each shell commands in one thread
 	showErrors    bool   // returns the standard output even if the command exits with a non-zero exit code
 	includeStderr bool   // also returns output written to stderr (default is stdout only)
