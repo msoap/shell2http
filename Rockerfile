@@ -1,0 +1,20 @@
+FROM golang:alpine
+
+MOUNT .:/app/src/shell2http
+WORKDIR /app/src/shell2http
+ENV GOPATH=/app
+RUN apk add --no-cache git; \
+    go get ./...; \
+    go build -o shell2http
+
+EXPORT shell2http
+
+# result image with binary only
+FROM alpine
+
+RUN mkdir /app
+IMPORT shell2http /app/shell2http
+ENTRYPOINT ["/app/shell2http"]
+CMD ["-help"]
+
+PUSH msoap/shell2http:latest

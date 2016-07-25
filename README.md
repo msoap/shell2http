@@ -102,6 +102,22 @@ Examples
 
 [More examples](https://github.com/msoap/shell2http/wiki)
 
+Run from Docker-container
+-------------------------
+Example of `test.Dockerfile` for server for get current date:
+
+```
+FROM msoap/shell2http
+# may be install some alpine packages:
+# RUN apk add --no-cache ...
+CMD ["/date", "date"]
+```
+
+Build and run container:
+
+    docker build -f test.Dockerfile -t date-server .
+    docker run --rm date-server
+
 See also
 --------
 
