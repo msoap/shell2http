@@ -31,6 +31,7 @@ Usage:
 		-shell="shell"  : shell for execute command, "" - without shell
 		-cache=NNN      : caching command out for NNN seconds
 		-one-thread     : run each shell command in one thread
+		-include-stderr : also returns output written to stderr (default is stdout only)
 		-version
 		-help
 
@@ -151,6 +152,7 @@ type Config struct {
 	shell         string // export all current environment vars
 	cache         int    // caching command out (in seconds)
 	oneThread     bool   // run each shell commands in one thread
+	includeStderr bool   // also returns output written to stderr (default is stdout only)
 }
 
 // ------------------------------------------------------------------
@@ -169,6 +171,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.StringVar(&appConfig.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
 	flag.IntVar(&appConfig.cache, "cache", 0, "caching command out (in seconds)")
 	flag.BoolVar(&appConfig.oneThread, "one-thread", false, "run each shell command in one thread")
+	flag.BoolVar(&appConfig.includeStderr, "include-stderr", false, "also returns output written to stderr (default is stdout only)")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -277,8 +280,16 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			defer mutex.Unlock()
 		}
 
-		osExecCommand.Stderr = os.Stderr
-		shellOut, err := osExecCommand.Output()
+		var (
+			shellOut []byte
+			err      error
+		)
+		if appConfig.includeStderr {
+			shellOut, err = osExecCommand.CombinedOutput()
+		} else {
+			osExecCommand.Stderr = os.Stderr
+			shellOut, err = osExecCommand.Output()
+		}
 
 		if err != nil {
 			log.Println("exec error: ", err)

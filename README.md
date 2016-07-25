@@ -51,6 +51,7 @@ Usage
         -shell="shell"  : shell for execute command, "" - without shell
         -cache=NNN      : caching command out for NNN seconds
         -one-thread     : run each shell command in one thread
+        -include-stderr : also returns output written to stderr (default is stdout only)
         -version
         -help
 
