@@ -118,7 +118,7 @@ CMD ["/date", "date"]
 Build and run container:
 
     docker build -f test.Dockerfile -t date-server .
-    docker run --rm date-server
+    docker run --rm -p 8080:8080 date-server
 
 See also
 --------
