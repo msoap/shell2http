@@ -1,5 +1,7 @@
 language: go
-sudo: false
+sudo: required
+services:
+  - docker
 
 env:
   global:
