@@ -294,8 +294,11 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			shellOut, err = osExecCommand.Output()
 		}
 
-		if err != nil && !appConfig.showErrors {
+		if err != nil {
 			log.Println("exec error: ", err)
+		}
+
+		if err != nil && !appConfig.showErrors {
 			fmt.Fprint(rw, "exec error: ", err)
 		} else {
 			outText := string(shellOut)
