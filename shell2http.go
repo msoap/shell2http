@@ -102,6 +102,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/koding/cache"
@@ -294,9 +295,18 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			shellOut, err = osExecCommand.Output()
 		}
 
+		exitCode := 0
 		if err != nil {
 			log.Println("exec error: ", err)
+
+			// get exit code. May be works on POSIX-system only, need test on Windows
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					exitCode = status.ExitStatus()
+				}
+			}
 		}
+		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", exitCode))
 
 		if err != nil && !appConfig.showErrors {
 			fmt.Fprint(rw, "exec error: ", err)
