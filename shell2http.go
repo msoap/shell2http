@@ -477,21 +477,28 @@ text
 
 */
 func parseCGIHeaders(shellOut string) (string, map[string]string) {
-	headersMap := map[string]string{}
 	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shellOut, 2)
 	if len(parts) == 2 {
-		re := regexp.MustCompile(`(\S+):\s*(.+)\r?\n?`)
-		headers := re.FindAllStringSubmatch(parts[0], -1)
-		if len(headers) > 0 {
-			for _, header := range headers {
-				headersMap[header[1]] = header[2]
+
+		headerRe := regexp.MustCompile(`^([^:\s]+):\s*(\S.*)$`)
+		headerLines := regexp.MustCompile(`\r?\n`).Split(parts[0], -1)
+		headersMap := map[string]string{}
+
+		for _, headerLine := range headerLines {
+			headerParts := headerRe.FindStringSubmatch(headerLine)
+			if len(headerParts) == 3 {
+				headersMap[headerParts[1]] = headerParts[2]
+			} else {
+				// headers is not valid, return all text
+				return shellOut, map[string]string{}
 			}
-			return parts[1], headersMap
 		}
+
+		return parts[1], headersMap
 	}
 
 	// headers dont found, return all text
-	return shellOut, headersMap
+	return shellOut, map[string]string{}
 }
 
 // ------------------------------------------------------------------

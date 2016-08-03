@@ -39,6 +39,36 @@ func Test_parseCGIHeaders(t *testing.T) {
 			out:     "Some text",
 			headers: map[string]string{"Location": "url", "X-Name": "x-value"},
 		},
+		{
+			in:      "Some text\nText\n\ntext",
+			out:     "Some text\nText\n\ntext",
+			headers: map[string]string{},
+		},
+		{
+			in:      "Some text\nText: value in text\n\ntext",
+			out:     "Some text\nText: value in text\n\ntext",
+			headers: map[string]string{},
+		},
+		{
+			in:      "Text::::\n\ntext",
+			out:     "text",
+			headers: map[string]string{"Text": ":::"},
+		},
+		{
+			in:      "Text:     :::\n\ntext",
+			out:     "text",
+			headers: map[string]string{"Text": ":::"},
+		},
+		{
+			in:      "Text:     \n\ntext",
+			out:     "Text:     \n\ntext",
+			headers: map[string]string{},
+		},
+		{
+			in:      "Header: value\nText:     \n\ntext",
+			out:     "Header: value\nText:     \n\ntext",
+			headers: map[string]string{},
+		},
 	}
 
 	for i, item := range data {
