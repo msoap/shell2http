@@ -561,9 +561,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	adress := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
-	log.Printf("listen http://%s/\n", adress)
-	err = http.ListenAndServe(adress, nil)
+	address := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
+	log.Printf("listen http://%s/\n", address)
+	err = http.ListenAndServe(address, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
