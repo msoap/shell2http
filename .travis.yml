@@ -5,11 +5,11 @@ services:
 
 env:
   global:
-    - CURRENT_GO_VERSION="1.6.3"
+    - CURRENT_GO_VERSION="1.7"
 
 go:
-  - 1.5.4
   - 1.6.3
+  - 1.7
   - tip
 
 before_install:
