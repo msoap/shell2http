@@ -5,16 +5,16 @@ services:
 
 env:
   global:
-    - CURRENT_GO_VERSION="1.7.1"
+    - CURRENT_GO_VERSION="1.7.3"
 
 go:
   - 1.6.3
-  - 1.7.1
+  - 1.7.3
   - tip
 
 before_install:
   - go get github.com/mattn/goveralls
-  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/philwinder/gocoverage
   - go get github.com/kisielk/errcheck
   - curl -SL https://github.com/grammarly/rocker/releases/download/1.3.0/rocker_linux_amd64.tar.gz | tar -xzC $GOPATH/bin
 
@@ -27,7 +27,7 @@ script:
   - errcheck ./...
   - diff <(gofmt -d .) <(echo -n "")
   - if [ "$TRAVIS_GO_VERSION" = "$CURRENT_GO_VERSION" ]; then
-      $HOME/gopath/bin/goveralls -service=travis-ci || true;
+      gocoverage && goveralls -coverprofile=profile.cov -service=travis-ci || true;
     fi
 
 after_success:
