@@ -45,6 +45,7 @@ Examples:
 	shell2http -form /form 'echo $v_from, $v_to'
 	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 	shell2http -cgi /set 'touch file; echo "Location: /\n"'
+	shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
 	shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
 More complex examples:
@@ -100,6 +101,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -157,6 +159,8 @@ type Config struct {
 	showErrors    bool   // returns the standard output even if the command exits with a non-zero exit code
 	includeStderr bool   // also returns output written to stderr (default is stdout only)
 }
+
+const maxHTTPCode = 1000
 
 // ------------------------------------------------------------------
 // parse arguments
@@ -252,6 +256,7 @@ func printAccessLogLine(req *http.Request) {
 // getShellHandler - get handler function for one shell command
 func getShellHandler(appConfig Config, path string, shell string, params []string, cacheTTL *cache.MemoryTTL) func(http.ResponseWriter, *http.Request) {
 	mutex := sync.Mutex{}
+	reStatusCode := regexp.MustCompile(`^\d+`)
 
 	shellHandler := func(rw http.ResponseWriter, req *http.Request) {
 		printAccessLogLine(req)
@@ -315,11 +320,28 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			if appConfig.setCGI {
 				headers := map[string]string{}
 				outText, headers = parseCGIHeaders(outText)
+				customStatusCode := 0
+
 				for headerKey, headerValue := range headers {
-					rw.Header().Set(headerKey, headerValue)
-					if headerKey == "Location" {
-						rw.WriteHeader(http.StatusFound)
+					switch headerKey {
+					case "Status":
+						statusParts := reStatusCode.FindAllString(headerValue, -1)
+						if len(statusParts) > 0 {
+							statusCode, err := strconv.Atoi(statusParts[0])
+							if err == nil && statusCode > 0 && statusCode < maxHTTPCode {
+								customStatusCode = statusCode
+								continue
+							}
+						}
+					case "Location":
+						customStatusCode = http.StatusFound
 					}
+
+					rw.Header().Set(headerKey, headerValue)
+				}
+
+				if customStatusCode > 0 {
+					rw.WriteHeader(customStatusCode)
 				}
 			}
 			fmt.Fprint(rw, outText)

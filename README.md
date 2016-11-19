@@ -76,6 +76,8 @@ Examples
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
     # redirect
     shell2http -cgi /set 'touch file; echo "Location: /\n"'
+    # custom HTTP code
+    shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
 
 ##### simple http-proxy server (for logging all URLs)
     # setup proxy as "http://localhost:8080/"
