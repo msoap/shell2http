@@ -5,12 +5,12 @@ services:
 
 env:
   global:
-    - CURRENT_GO_VERSION="1.7.4"
+    - CURRENT_GO_VERSION="1.7"
 
 go:
-  - 1.6.4
-  - 1.7.4
-  - tip
+  - 1.6.x
+  - 1.7.x
+  - master
 
 before_install:
   - go get github.com/mattn/goveralls
@@ -21,16 +21,15 @@ before_install:
 install: go get -t ./...
 
 script:
-  - go test -v ./...
-  - if [ "$TRAVIS_GO_VERSION" = "$CURRENT_GO_VERSION" ]; then go test -race -v ./...; fi
+  - go test -race -v ./...
   - go vet ./...
   - errcheck ./...
   - diff <(gofmt -d .) <(echo -n "")
-  - if [ "$TRAVIS_GO_VERSION" = "$CURRENT_GO_VERSION" ]; then
+  - if [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]]; then
       gocoverage && goveralls -coverprofile=profile.cov -service=travis-ci || true;
     fi
 
 after_success:
-  - if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_GO_VERSION" = "$CURRENT_GO_VERSION" ]; then
+  - if [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]]; then
       rocker build --auth "$DOCKER_USERNAME:$(echo $DOCKER_PASSWORD | base64 -d)" --pull --meta --push;
     fi
