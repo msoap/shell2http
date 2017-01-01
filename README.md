@@ -54,6 +54,8 @@ Usage
         -one-thread     : run each shell command in one thread
         -show-errors    : show the standard output even if the command exits with a non-zero exit code
         -include-stderr : include stderr to output (default is stdout only)
+        -cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
+        -key=key.pem    : SSL private key path
         -version
         -help
 
@@ -122,6 +124,17 @@ Build and run container:
 
     docker build -f test.Dockerfile -t date-server .
     docker run --rm -p 8080:8080 date-server
+
+SSL
+---
+
+Run https server:
+
+    shell2telegram -cert=./cert.pem -key=./key.pem ...
+
+Generate self-signed certificate:
+
+    go run $(go env GOROOT)/src/crypto/tls/generate_cert.go -host localhost
 
 See also
 --------
