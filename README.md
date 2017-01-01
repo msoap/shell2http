@@ -54,7 +54,7 @@ Usage
         -one-thread     : run each shell command in one thread
         -show-errors    : show the standard output even if the command exits with a non-zero exit code
         -include-stderr : include stderr to output (default is stdout only)
-        -cert=cert.pem  : SSL certificate path (if specified -cert/-key - run https server)
+        -cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
         -key=key.pem    : SSL private key path
         -version
         -help

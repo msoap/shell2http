@@ -33,6 +33,8 @@ Usage:
 		-one-thread     : run each shell command in one thread
 		-show-errors    : show the standard output even if the command exits with a non-zero exit code
 		-include-stderr : include stderr to output (default is stdout only)
+		-cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
+		-key=key.pem    : SSL private key path
 		-version
 		-help
 
@@ -112,7 +114,7 @@ import (
 )
 
 // VERSION - version
-const VERSION = "1.6"
+const VERSION = "1.7"
 
 // PORT - default port for http-server
 const PORT = 8080
@@ -150,6 +152,8 @@ type Config struct {
 	host          string // server host
 	exportVars    string // list of environment vars for export to script
 	shell         string // export all current environment vars
+	cert          string // SSL certificate
+	key           string // SSL private key path
 	exportAllVars bool   // export all current environment vars
 	setCGI        bool   // set CGI variables
 	setForm       bool   // parse form from URL
@@ -180,6 +184,8 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.BoolVar(&appConfig.oneThread, "one-thread", false, "run each shell command in one thread")
 	flag.BoolVar(&appConfig.showErrors, "show-errors", false, "show the standard output even if the command exits with a non-zero exit code")
 	flag.BoolVar(&appConfig.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
+	flag.StringVar(&appConfig.cert, "cert", "", "SSL certificate path (if specified -cert/-key options - run https server)")
+	flag.StringVar(&appConfig.key, "key", "", "SSL private key path")
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
@@ -199,6 +205,11 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 			log.Fatalf("error opening log file: %v", err)
 		}
 		log.SetOutput(fhLog)
+	}
+
+	if len(appConfig.cert) > 0 && len(appConfig.key) == 0 ||
+		len(appConfig.cert) == 0 && len(appConfig.key) > 0 {
+		return nil, Config{}, fmt.Errorf("error: need both -cert and -key options")
 	}
 
 	// need >= 2 arguments and count of it must be even
@@ -584,9 +595,12 @@ func main() {
 	}
 
 	address := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
-	log.Printf("listen http://%s/\n", address)
-	err = http.ListenAndServe(address, nil)
-	if err != nil {
-		log.Fatal(err)
+
+	if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
+		log.Printf("listen https://%s/\n", address)
+		log.Fatal(http.ListenAndServeTLS(address, appConfig.cert, appConfig.key, nil))
+	} else {
+		log.Printf("listen http://%s/\n", address)
+		log.Fatal(http.ListenAndServe(address, nil))
 	}
 }
