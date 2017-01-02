@@ -19,10 +19,10 @@ Usage:
 		-host="host"    : host for http server, default - all interfaces
 		-port=NNNN      : port for http server, default - 8080
 		-form           : parse query into environment vars
-		-cgi            : exec as CGI-script
-		                  set environment variables
-		                  write POST-data to STDIN (if not set -form)
-		                  parse headers from script (Location: XXX)
+		-cgi            : run scripts in CGI-mode:
+		                  - set environment variables
+		                  - write POST-data to STDIN (if not set -form)
+		                  - parse headers from script (eg: "Location: URL\n\n")
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
 		-export-all-vars: export all current environment vars
 		-no-index       : dont generate index page
@@ -173,7 +173,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
 	flag.StringVar(&appConfig.host, "host", "", "host for http server")
-	flag.BoolVar(&appConfig.setCGI, "cgi", false, "exec as CGI-script")
+	flag.BoolVar(&appConfig.setCGI, "cgi", false, "run scripts in CGI-mode")
 	flag.StringVar(&appConfig.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
 	flag.BoolVar(&appConfig.exportAllVars, "export-all-vars", false, "export all current environment vars")
 	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars")

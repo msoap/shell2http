@@ -39,10 +39,10 @@ Usage
         -host="host"    : host for http server, default - all interfaces
         -port=NNNN      : port for http server, default - 8080
         -form           : parse query into environment vars
-        -cgi            : exec as CGI-script
-                          set environment variables
-                          write POST-data to STDIN (if not set -form)
-                          parse headers from script (Location: XXX)
+        -cgi            : run scripts in CGI-mode:
+                          - set environment variables
+                          - write POST-data to STDIN (if not set -form)
+                          - parse headers from script (eg: "Location: URL\n\n")
         -export-vars=var: export environment vars ("VAR1,VAR2,...")
                           by default export PATH, HOME, LANG, USER, TMPDIR
         -export-all-vars: export all current environment vars
