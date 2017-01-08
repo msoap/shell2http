@@ -164,7 +164,10 @@ type Config struct {
 	includeStderr bool   // also returns output written to stderr (default is stdout only)
 }
 
-const maxHTTPCode = 1000
+const (
+	maxHTTPCode     = 1000
+	cacheGCInterval = 60 // in seconds
+)
 
 // ------------------------------------------------------------------
 // parse arguments
@@ -274,7 +277,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 		setCommonHeaders(rw)
 
 		if appConfig.cache > 0 {
-			cacheData, err := cacheTTL.Get(path)
+			cacheData, err := cacheTTL.Get(req.RequestURI)
 			if err != cache.ErrNotFound && err != nil {
 				log.Print(err)
 			} else if err == nil {
@@ -358,7 +361,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			fmt.Fprint(rw, outText)
 
 			if appConfig.cache > 0 {
-				err := cacheTTL.Set(path, outText)
+				err := cacheTTL.Set(req.RequestURI, outText)
 				if err != nil {
 					log.Print(err)
 				}
@@ -587,7 +590,7 @@ func main() {
 	var cacheTTL *cache.MemoryTTL
 	if appConfig.cache > 0 {
 		cacheTTL = cache.NewMemoryWithTTL(time.Duration(appConfig.cache) * time.Second)
-		cacheTTL.StartGC(time.Duration(appConfig.cache) * time.Second * 2)
+		cacheTTL.StartGC(cacheGCInterval * time.Second)
 	}
 	err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
 	if err != nil {
