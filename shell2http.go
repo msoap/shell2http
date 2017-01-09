@@ -11,7 +11,7 @@ MacOS install:
 	brew tap msoap/tools
 	brew install shell2http
 	# update:
-	brew update; brew upgrade shell2http
+	brew upgrade shell2http
 
 Usage:
 	shell2http [options] /path "shell command" /path2 "shell command2" ...

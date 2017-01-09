@@ -20,7 +20,7 @@ MacOS:
     brew tap msoap/tools
     brew install shell2http
     # update:
-    brew update; brew upgrade shell2http
+    brew upgrade shell2http
 
 Or download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
 
