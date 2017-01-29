@@ -15,5 +15,8 @@ lint:
 	go vet ./...
 	errcheck ./...
 
+gometalinter:
+	gometalinter --vendor --cyclo-over=25 --line-length=150 --dupl-threshold=150 --min-occurrences=3 --enable=misspell --deadline=10m
+
 build-docker-image:
 	rocker build
