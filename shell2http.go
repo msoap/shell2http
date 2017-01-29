@@ -174,7 +174,7 @@ const (
 )
 
 // ------------------------------------------------------------------
-// parse arguments
+// getConfig - parse arguments
 func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	var (
 		logFilename string
@@ -253,7 +253,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 }
 
 // ------------------------------------------------------------------
-// get default shell and command
+// getShellAndParams - get default shell and command
 func getShellAndParams(cmd string, customShell string, isWindows bool) (shell string, params []string, err error) {
 	shell, params = "sh", []string{"-c", cmd}
 	if isWindows {
@@ -302,12 +302,12 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 				log.Print(err)
 			} else if err == nil {
 				// cache hit
-				fmt.Fprint(rw, cacheData.(string))
+				responseWrite(rw, cacheData.(string))
 				return
 			}
 		}
 
-		osExecCommand := exec.Command(shell, params...)
+		osExecCommand := exec.Command(shell, params...) // #nosec
 
 		proxySystemEnv(osExecCommand, appConfig)
 		if appConfig.setForm {
@@ -348,7 +348,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", exitCode))
 
 		if err != nil && !appConfig.showErrors {
-			fmt.Fprint(rw, "exec error: ", err)
+			responseWrite(rw, "exec error: "+err.Error())
 		} else {
 			outText := string(shellOut)
 			if appConfig.setCGI {
@@ -378,7 +378,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 					rw.WriteHeader(customStatusCode)
 				}
 			}
-			fmt.Fprint(rw, outText)
+			responseWrite(rw, outText)
 
 			if appConfig.cache > 0 {
 				err := cacheTTL.Set(req.RequestURI, outText)
@@ -421,7 +421,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 			handler: func(rw http.ResponseWriter, req *http.Request) {
 				printAccessLogLine(req)
 				setCommonHeaders(rw)
-				fmt.Fprint(rw, "Bye...")
+				responseWrite(rw, "Bye...")
 				go os.Exit(0)
 
 				return
@@ -445,7 +445,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 					return
 				}
 				printAccessLogLine(req)
-				fmt.Fprint(rw, indexHTML)
+				responseWrite(rw, indexHTML)
 
 				return
 			},
@@ -456,7 +456,16 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 }
 
 // ------------------------------------------------------------------
-// set some CGI variables
+// responseWrite - write text to response
+func responseWrite(rw io.Writer, text string) {
+	_, err := io.WriteString(rw, text)
+	if err != nil {
+		log.Printf("print string failed: %s", err)
+	}
+}
+
+// ------------------------------------------------------------------
+// setCGIEnv - set some CGI variables
 func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// set HTTP_* variables
 	for headerName, headerValue := range req.Header {
@@ -518,6 +527,7 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	}
 }
 
+// ------------------------------------------------------------------
 // errChain - handle errors on few functions
 func errChain(chainFuncs ...func() error) error {
 	for _, fn := range chainFuncs {
@@ -564,7 +574,7 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 }
 
 // ------------------------------------------------------------------
-// parse form into environment vars
+// getForm - parse form into environment vars
 func getForm(cmd *exec.Cmd, req *http.Request) {
 	err := req.ParseForm()
 	if err != nil {
@@ -578,7 +588,7 @@ func getForm(cmd *exec.Cmd, req *http.Request) {
 }
 
 // ------------------------------------------------------------------
-// proxy some system vars
+// proxySystemEnv - proxy some system vars
 func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 	varsNames := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
 
@@ -601,11 +611,12 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 }
 
 // ------------------------------------------------------------------
-// set headers for all handlers
+// setCommonHeaders - set headers for all handlers
 func setCommonHeaders(rw http.ResponseWriter) {
 	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 }
 
+// ------------------------------------------------------------------
 // basicAuthWrapper - add HTTP Basic Authentication
 func basicAuthWrapper(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
