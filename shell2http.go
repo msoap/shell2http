@@ -35,6 +35,7 @@ Usage:
 		-include-stderr : include stderr to output (default is stdout only)
 		-cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
 		-key=key.pem    : SSL private key path
+		-basic-auth=""	: setup HTTP Basic Authentication ("user_name:password")
 		-version
 		-help
 
@@ -155,6 +156,8 @@ type Config struct {
 	shell         string // export all current environment vars
 	cert          string // SSL certificate
 	key           string // SSL private key path
+	authUser      string // basic authentication user name
+	authPass      string // basic authentication password
 	exportAllVars bool   // export all current environment vars
 	setCGI        bool   // set CGI variables
 	setForm       bool   // parse form from URL
@@ -173,7 +176,11 @@ const (
 // ------------------------------------------------------------------
 // parse arguments
 func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
-	var logFilename string
+	var (
+		logFilename string
+		basicAuth   string
+	)
+
 	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
 	flag.StringVar(&appConfig.host, "host", "", "host for http server")
@@ -190,13 +197,17 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.BoolVar(&appConfig.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
 	flag.StringVar(&appConfig.cert, "cert", "", "SSL certificate path (if specified -cert/-key options - run https server)")
 	flag.StringVar(&appConfig.key, "key", "", "SSL private key path")
+	flag.StringVar(&basicAuth, "basic-auth", "", "setup HTTP Basic Authentication (\"user_name:password\")")
+
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
 	version := flag.Bool("version", false, "get version")
+
 	flag.Parse()
+
 	if *version {
 		fmt.Println(VERSION)
 		os.Exit(0)
@@ -214,6 +225,14 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	if len(appConfig.cert) > 0 && len(appConfig.key) == 0 ||
 		len(appConfig.cert) == 0 && len(appConfig.key) > 0 {
 		return nil, Config{}, fmt.Errorf("error: need both -cert and -key options")
+	}
+
+	if len(basicAuth) > 0 {
+		basicAuthParts := strings.SplitN(basicAuth, ":", 2)
+		if len(basicAuthParts) != 2 {
+			log.Fatalf("HTTP basic authentication must be in format: name:password")
+		}
+		appConfig.authUser, appConfig.authPass = basicAuthParts[0], basicAuthParts[1]
 	}
 
 	// need >= 2 arguments and count of it must be even
@@ -587,6 +606,22 @@ func setCommonHeaders(rw http.ResponseWriter) {
 	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 }
 
+// basicAuthWrapper - add HTTP Basic Authentication
+func basicAuthWrapper(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		reqUser, reqPass, ok := req.BasicAuth()
+		if !ok || reqUser != user || reqPass != pass {
+			setCommonHeaders(rw)
+			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and passoerd"`)
+			http.Error(rw, "name/password is required", http.StatusUnauthorized)
+			printAccessLogLine(req)
+			return
+		}
+
+		handler(rw, req)
+	}
+}
+
 // ------------------------------------------------------------------
 func main() {
 	cmdHandlers, appConfig, err := getConfig()
@@ -605,7 +640,12 @@ func main() {
 		log.Fatal(err)
 	}
 	for _, handler := range cmdHandlers {
-		http.HandleFunc(handler.path, handler.handler)
+		handlerFunc := handler.handler
+		if len(appConfig.authUser) > 0 {
+			handlerFunc = basicAuthWrapper(handler.handler, appConfig.authUser, appConfig.authPass)
+		}
+
+		http.HandleFunc(handler.path, handlerFunc)
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)
 	}
 
