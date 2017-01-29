@@ -114,7 +114,7 @@ import (
 )
 
 // VERSION - version
-const VERSION = "1.7"
+const VERSION = "1.8"
 
 // PORT - default port for http-server
 const PORT = 8080
@@ -141,8 +141,9 @@ const INDEXHTML = `<!DOCTYPE html>
 
 // Command - one command type
 type Command struct {
-	path string
-	cmd  string
+	path    string
+	cmd     string
+	handler http.HandlerFunc
 }
 
 // Config - config struct
@@ -332,7 +333,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 		} else {
 			outText := string(shellOut)
 			if appConfig.setCGI {
-				headers := map[string]string{}
+				var headers map[string]string
 				outText, headers = parseCGIHeaders(outText)
 				customStatusCode := 0
 
@@ -375,58 +376,64 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 }
 
 // ------------------------------------------------------------------
-// setup http handlers
-func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) error {
+// setupHandlers - setup http handlers
+func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) ([]Command, error) {
 	indexLiHTML := ""
 	existsRootPath := false
 
-	for _, row := range cmdHandlers {
+	for i, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
 		shell, params, err := getShellAndParams(cmd, appConfig.shell, runtime.GOOS == "windows")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		http.HandleFunc(path, getShellHandler(appConfig, path, shell, params, cacheTTL))
 		existsRootPath = existsRootPath || path == "/"
 
-		log.Printf("register: %s (%s)\n", path, cmd)
 		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+		cmdHandlers[i].handler = getShellHandler(appConfig, path, shell, params, cacheTTL)
 	}
 
 	// --------------
 	if appConfig.addExit {
-		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
-			printAccessLogLine(req)
-			setCommonHeaders(rw)
-			fmt.Fprint(rw, "Bye...")
-			go os.Exit(0)
+		cmdHandlers = append(cmdHandlers, Command{
+			path: "/exit",
+			cmd:  "/exit",
+			handler: func(rw http.ResponseWriter, req *http.Request) {
+				printAccessLogLine(req)
+				setCommonHeaders(rw)
+				fmt.Fprint(rw, "Bye...")
+				go os.Exit(0)
 
-			return
+				return
+			},
 		})
 
-		log.Printf("register: %s (%s)\n", "/exit", "/exit")
 		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, "/exit", "/exit")
 	}
 
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
 		indexHTML := fmt.Sprintf(INDEXHTML, indexLiHTML)
-		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-			setCommonHeaders(rw)
-			if req.URL.Path != "/" {
-				log.Printf("404: %s", req.URL.Path)
-				http.NotFound(rw, req)
-				return
-			}
-			printAccessLogLine(req)
-			fmt.Fprint(rw, indexHTML)
+		cmdHandlers = append(cmdHandlers, Command{
+			path: "/",
+			cmd:  "index page",
+			handler: func(rw http.ResponseWriter, req *http.Request) {
+				setCommonHeaders(rw)
+				if req.URL.Path != "/" {
+					log.Printf("404: %s", req.URL.Path)
+					http.NotFound(rw, req)
+					return
+				}
+				printAccessLogLine(req)
+				fmt.Fprint(rw, indexHTML)
 
-			return
+				return
+			},
 		})
 	}
 
-	return nil
+	return cmdHandlers, nil
 }
 
 // ------------------------------------------------------------------
@@ -592,9 +599,14 @@ func main() {
 		cacheTTL = cache.NewMemoryWithTTL(time.Duration(appConfig.cache) * time.Second)
 		cacheTTL.StartGC(cacheGCInterval * time.Second)
 	}
-	err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
+
+	cmdHandlers, err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
+	}
+	for _, handler := range cmdHandlers {
+		http.HandleFunc(handler.path, handler.handler)
+		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)
 	}
 
 	address := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
