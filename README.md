@@ -56,6 +56,7 @@ Usage
         -include-stderr : include stderr to output (default is stdout only)
         -cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
         -key=key.pem    : SSL private key path
+        -basic-auth=""  : setup HTTP Basic Authentication ("user_name:password")
         -version
         -help
 

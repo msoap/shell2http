@@ -35,6 +35,7 @@ Usage:
 		-include-stderr : include stderr to output (default is stdout only)
 		-cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
 		-key=key.pem    : SSL private key path
+		-basic-auth=""	: setup HTTP Basic Authentication ("user_name:password")
 		-version
 		-help
 
@@ -114,7 +115,7 @@ import (
 )
 
 // VERSION - version
-const VERSION = "1.7"
+const VERSION = "1.8"
 
 // PORT - default port for http-server
 const PORT = 8080
@@ -141,8 +142,9 @@ const INDEXHTML = `<!DOCTYPE html>
 
 // Command - one command type
 type Command struct {
-	path string
-	cmd  string
+	path    string
+	cmd     string
+	handler http.HandlerFunc
 }
 
 // Config - config struct
@@ -154,6 +156,8 @@ type Config struct {
 	shell         string // export all current environment vars
 	cert          string // SSL certificate
 	key           string // SSL private key path
+	authUser      string // basic authentication user name
+	authPass      string // basic authentication password
 	exportAllVars bool   // export all current environment vars
 	setCGI        bool   // set CGI variables
 	setForm       bool   // parse form from URL
@@ -172,7 +176,11 @@ const (
 // ------------------------------------------------------------------
 // parse arguments
 func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
-	var logFilename string
+	var (
+		logFilename string
+		basicAuth   string
+	)
+
 	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
 	flag.StringVar(&appConfig.host, "host", "", "host for http server")
@@ -189,13 +197,17 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.BoolVar(&appConfig.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
 	flag.StringVar(&appConfig.cert, "cert", "", "SSL certificate path (if specified -cert/-key options - run https server)")
 	flag.StringVar(&appConfig.key, "key", "", "SSL private key path")
+	flag.StringVar(&basicAuth, "basic-auth", "", "setup HTTP Basic Authentication (\"user_name:password\")")
+
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
 	version := flag.Bool("version", false, "get version")
+
 	flag.Parse()
+
 	if *version {
 		fmt.Println(VERSION)
 		os.Exit(0)
@@ -213,6 +225,14 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	if len(appConfig.cert) > 0 && len(appConfig.key) == 0 ||
 		len(appConfig.cert) == 0 && len(appConfig.key) > 0 {
 		return nil, Config{}, fmt.Errorf("error: need both -cert and -key options")
+	}
+
+	if len(basicAuth) > 0 {
+		basicAuthParts := strings.SplitN(basicAuth, ":", 2)
+		if len(basicAuthParts) != 2 {
+			log.Fatalf("HTTP basic authentication must be in format: name:password")
+		}
+		appConfig.authUser, appConfig.authPass = basicAuthParts[0], basicAuthParts[1]
 	}
 
 	// need >= 2 arguments and count of it must be even
@@ -332,7 +352,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 		} else {
 			outText := string(shellOut)
 			if appConfig.setCGI {
-				headers := map[string]string{}
+				var headers map[string]string
 				outText, headers = parseCGIHeaders(outText)
 				customStatusCode := 0
 
@@ -375,58 +395,64 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 }
 
 // ------------------------------------------------------------------
-// setup http handlers
-func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) error {
+// setupHandlers - setup http handlers
+func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) ([]Command, error) {
 	indexLiHTML := ""
 	existsRootPath := false
 
-	for _, row := range cmdHandlers {
+	for i, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
 		shell, params, err := getShellAndParams(cmd, appConfig.shell, runtime.GOOS == "windows")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		http.HandleFunc(path, getShellHandler(appConfig, path, shell, params, cacheTTL))
 		existsRootPath = existsRootPath || path == "/"
 
-		log.Printf("register: %s (%s)\n", path, cmd)
 		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+		cmdHandlers[i].handler = getShellHandler(appConfig, path, shell, params, cacheTTL)
 	}
 
 	// --------------
 	if appConfig.addExit {
-		http.HandleFunc("/exit", func(rw http.ResponseWriter, req *http.Request) {
-			printAccessLogLine(req)
-			setCommonHeaders(rw)
-			fmt.Fprint(rw, "Bye...")
-			go os.Exit(0)
+		cmdHandlers = append(cmdHandlers, Command{
+			path: "/exit",
+			cmd:  "/exit",
+			handler: func(rw http.ResponseWriter, req *http.Request) {
+				printAccessLogLine(req)
+				setCommonHeaders(rw)
+				fmt.Fprint(rw, "Bye...")
+				go os.Exit(0)
 
-			return
+				return
+			},
 		})
 
-		log.Printf("register: %s (%s)\n", "/exit", "/exit")
 		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, "/exit", "/exit")
 	}
 
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
 		indexHTML := fmt.Sprintf(INDEXHTML, indexLiHTML)
-		http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-			setCommonHeaders(rw)
-			if req.URL.Path != "/" {
-				log.Printf("404: %s", req.URL.Path)
-				http.NotFound(rw, req)
-				return
-			}
-			printAccessLogLine(req)
-			fmt.Fprint(rw, indexHTML)
+		cmdHandlers = append(cmdHandlers, Command{
+			path: "/",
+			cmd:  "index page",
+			handler: func(rw http.ResponseWriter, req *http.Request) {
+				setCommonHeaders(rw)
+				if req.URL.Path != "/" {
+					log.Printf("404: %s", req.URL.Path)
+					http.NotFound(rw, req)
+					return
+				}
+				printAccessLogLine(req)
+				fmt.Fprint(rw, indexHTML)
 
-			return
+				return
+			},
 		})
 	}
 
-	return nil
+	return cmdHandlers, nil
 }
 
 // ------------------------------------------------------------------
@@ -580,6 +606,22 @@ func setCommonHeaders(rw http.ResponseWriter) {
 	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 }
 
+// basicAuthWrapper - add HTTP Basic Authentication
+func basicAuthWrapper(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		reqUser, reqPass, ok := req.BasicAuth()
+		if !ok || reqUser != user || reqPass != pass {
+			setCommonHeaders(rw)
+			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and passoerd"`)
+			http.Error(rw, "name/password is required", http.StatusUnauthorized)
+			printAccessLogLine(req)
+			return
+		}
+
+		handler(rw, req)
+	}
+}
+
 // ------------------------------------------------------------------
 func main() {
 	cmdHandlers, appConfig, err := getConfig()
@@ -592,9 +634,19 @@ func main() {
 		cacheTTL = cache.NewMemoryWithTTL(time.Duration(appConfig.cache) * time.Second)
 		cacheTTL.StartGC(cacheGCInterval * time.Second)
 	}
-	err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
+
+	cmdHandlers, err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
+	}
+	for _, handler := range cmdHandlers {
+		handlerFunc := handler.handler
+		if len(appConfig.authUser) > 0 {
+			handlerFunc = basicAuthWrapper(handler.handler, appConfig.authUser, appConfig.authPass)
+		}
+
+		http.HandleFunc(handler.path, handlerFunc)
+		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)
 	}
 
 	address := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
