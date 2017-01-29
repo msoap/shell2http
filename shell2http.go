@@ -215,7 +215,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 
 	// setup log file
 	if len(logFilename) > 0 {
-		fhLog, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		fhLog, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 		if err != nil {
 			log.Fatalf("error opening log file: %v", err)
 		}
