@@ -69,42 +69,42 @@ Examples
     shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
     shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
-##### HTML calendar for current year
+### HTML calendar for current year
     shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 
-##### get URL parameters (http://localhost:8080/form?from=10&to=100)
+### get URL parameters (http://localhost:8080/form?from=10&to=100)
     shell2http -form /form 'echo $v_from, $v_to'
 
-##### CGI scripts
+### CGI scripts
     shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
     # redirect
     shell2http -cgi /set 'touch file; echo "Location: /\n"'
     # custom HTTP code
     shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
 
-##### simple http-proxy server (for logging all URLs)
+### simple http-proxy server (for logging all URLs)
     # setup proxy as "http://localhost:8080/"
     shell2http -log=/dev/null -cgi / 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
 
-##### test slow connection (http://localhost:8080/slow?duration=10)
+### test slow connection (http://localhost:8080/slow?duration=10)
     shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 
-##### proxy with cache in files (for debug with production API with rate limit)
+### proxy with cache in files (for debug with production API with rate limit)
     # get "http://localhost:8080/get?url=http://api.url/"
     shell2http -form \
         /form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
         /get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
 
-##### remote sound volume control (Mac OS)
+### remote sound volume control (Mac OS)
     shell2http /get  'osascript -e "output volume of (get volume settings)"' \
                /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
                /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
 
-##### remote control for Vox.app player (Mac OS)
+### remote control for Vox.app player (Mac OS)
     shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
                /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
 
-##### get four random OS X wallpapers
+### get four random OS X wallpapers
     shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
                /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
 
