@@ -33,3 +33,24 @@ after_success:
   - if [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ $TRAVIS_EVENT_TYPE == "push" ]]; then
       rocker build --auth "$DOCKER_USERNAME:$(echo $DOCKER_PASSWORD | base64 -d)" --pull --meta --push;
     fi
+
+before_deploy:
+  - curl -SL https://raw.githubusercontent.com/msoap/etc/master/golang-cross-build/golang-cross-build.sh > $GOPATH/bin/golang-cross-build.sh
+  - chmod 700 $GOPATH/bin/golang-cross-build.sh
+  - golang-cross-build.sh shell2http
+  - ls -l *.zip *.tar.gz
+
+deploy:
+  provider: releases
+  api_key:
+    secure: blcSNUN/RbiY7thbkyvwjL9QpNUgkkulxWG0TilnuVUZ22qAkaTcOS4A1AVrJZJkMzXce9QRHiSTEAJZOxlDQXyip8wKZETLXxNQl0i3R4CYVN7p8DapOD/AEY8YXfpwLEFWF/fWZEDv3SzeVjp8kvpan+mH3AsUwMVIFyOpZUDdYV1Uhu57T7QBS5FHnQgDqpcHHgV6f3fii6ZNfhew46ix5+7xqTyaN8Bgn72Yu+OKemi9GxxrokUVrH1GliOYX9UEyBmiMIEHFaFQeOTQYQg4/BvC5l8F7JLrAu/vZJvqM333SJhwn/zkPsxn68h2gY2Hu24oK8jmakwJ25lo+pp4mu/2nqCaTUwH9lV4UlXLdhlqf00nCQhdUG9vvU0wB62BtCpOjd3ZdSxZVkh9eZtOt/1hAGRPsDAi45RgEaeNpOfGkoGkr3PPDTWpBM6Un5DiGX1fFWMgK1XfjZpjo+a6xgyCTVK/nd/ZtfPJhx2VuVB4Crnv34luLtZMYIdMZbx0ErPKMrzMEQS8tjPLCoSaGNy+NbrQLNT7p1Ypd355AuB3iqKQMiIVLMvfxiiJOuxDHj0wTrOwdgL6d7Wd5rvMiS3y8aSm95lnC/JeyTfHNxUS30IMZtMxm2/wnsRaJFA/1MELYybkkcztOyCXL/E138kOiXDqQW7T/qXw4OI=
+  file_glob: "true"
+  file:
+    - "*.zip"
+    - "*.tar.gz"
+  skip_cleanup: true
+  on:
+    tags: true
+    branch: master
+    condition: $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION
+    repo: msoap/shell2http
