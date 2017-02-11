@@ -108,10 +108,10 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
-	"github.com/koding/cache"
 	"github.com/mattn/go-shellwords"
+	"github.com/msoap/raphanus"
+	raphanuscommon "github.com/msoap/raphanus/common"
 )
 
 // VERSION - version
@@ -288,7 +288,7 @@ func printAccessLogLine(req *http.Request) {
 
 // ------------------------------------------------------------------
 // getShellHandler - get handler function for one shell command
-func getShellHandler(appConfig Config, path string, shell string, params []string, cacheTTL *cache.MemoryTTL) func(http.ResponseWriter, *http.Request) {
+func getShellHandler(appConfig Config, path string, shell string, params []string, cacheTTL raphanus.DB) func(http.ResponseWriter, *http.Request) {
 	mutex := sync.Mutex{}
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
@@ -297,12 +297,11 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 		setCommonHeaders(rw)
 
 		if appConfig.cache > 0 {
-			cacheData, err := cacheTTL.Get(req.RequestURI)
-			if err != cache.ErrNotFound && err != nil {
+			if cacheData, err := cacheTTL.GetStr(req.RequestURI); err != raphanuscommon.ErrKeyNotExists && err != nil {
 				log.Print(err)
 			} else if err == nil {
 				// cache hit
-				responseWrite(rw, cacheData.(string))
+				responseWrite(rw, cacheData)
 				return
 			}
 		}
@@ -381,8 +380,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			responseWrite(rw, outText)
 
 			if appConfig.cache > 0 {
-				err := cacheTTL.Set(req.RequestURI, outText)
-				if err != nil {
+				if err := cacheTTL.SetStr(req.RequestURI, outText, appConfig.cache); err != nil {
 					log.Print(err)
 				}
 			}
@@ -396,7 +394,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 
 // ------------------------------------------------------------------
 // setupHandlers - setup http handlers
-func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.MemoryTTL) ([]Command, error) {
+func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB) ([]Command, error) {
 	indexLiHTML := ""
 	existsRootPath := false
 
@@ -458,8 +456,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL *cache.Memo
 // ------------------------------------------------------------------
 // responseWrite - write text to response
 func responseWrite(rw io.Writer, text string) {
-	_, err := io.WriteString(rw, text)
-	if err != nil {
+	if _, err := io.WriteString(rw, text); err != nil {
 		log.Printf("print string failed: %s", err)
 	}
 }
@@ -640,10 +637,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var cacheTTL *cache.MemoryTTL
+	var cacheTTL raphanus.DB
 	if appConfig.cache > 0 {
-		cacheTTL = cache.NewMemoryWithTTL(time.Duration(appConfig.cache) * time.Second)
-		cacheTTL.StartGC(cacheGCInterval * time.Second)
+		cacheTTL = raphanus.New("", 0)
 	}
 
 	cmdHandlers, err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
