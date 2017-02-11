@@ -20,3 +20,6 @@ gometalinter:
 
 build-docker-image:
 	rocker build
+
+generate-manpage:
+	docker run -it --rm -v $$PWD:/app -w /app ruby-ronn sh -c 'cat README.md | grep -v "^\[" > shell2http.md; ronn shell2http.md; mv ./shell2http ./shell2http.1; rm ./shell2http.html ./shell2http.md'
