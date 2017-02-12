@@ -169,8 +169,7 @@ type Config struct {
 }
 
 const (
-	maxHTTPCode     = 1000
-	cacheGCInterval = 60 // in seconds
+	maxHTTPCode = 1000
 )
 
 // ------------------------------------------------------------------
