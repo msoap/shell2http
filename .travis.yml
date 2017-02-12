@@ -5,6 +5,7 @@ services:
 
 env:
   global:
+    - APP_NAME=shell2http
     - CURRENT_GO_VERSION="1.7"
 
 go:
@@ -37,8 +38,11 @@ after_success:
 before_deploy:
   - curl -SL https://raw.githubusercontent.com/msoap/etc/master/golang-cross-build/golang-cross-build.sh > $GOPATH/bin/golang-cross-build.sh
   - chmod 700 $GOPATH/bin/golang-cross-build.sh
-  - golang-cross-build.sh shell2http
-  - ls -l *.zip *.tar.gz
+  - golang-cross-build.sh $APP_NAME
+  - gem install --no-ri --no-rdoc fpm
+  - GOOS=linix GOARCH=amd64 go build -ldflags="-w"
+  - fpm -s dir -t deb --name $APP_NAME -v $TRAVIS_TAG ./$APP_NAME=/usr/bin/ ./$APP_NAME.1=/usr/share/man/man1/ LICENSE=/usr/share/doc/$APP_NAME/copyright README.md=/usr/share/doc/$APP_NAME/
+  - ls -l *.zip *.tar.gz *.deb
 
 deploy:
   provider: releases
@@ -48,9 +52,10 @@ deploy:
   file:
     - "*.zip"
     - "*.tar.gz"
+    - "*.deb"
   skip_cleanup: true
   on:
     tags: true
     branch: master
     condition: $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION
-    repo: msoap/shell2http
+    repo: msoap/$APP_NAME
