@@ -1,3 +1,9 @@
+APP_NAME := shell2http
+APP_DESCRIPTION := $$(awk 'NR == 11, NR == 13' README.md)
+APP_URL := https://github.com/msoap/$(APP_NAME)
+APP_MAINTAINER := $$(git show HEAD | awk '$$1 == "Author:" {print $$2 " " $$3 " " $$4}')
+GIT_TAG := $$(git tag 2>/dev/null | grep -E '^[0-9]+' | tail -1)
+
 run:
 	go run shell2http.go -add-exit -cgi /date date /env 'printenv | sort'
 
@@ -5,7 +11,7 @@ build:
 	go build shell2http.go
 
 update-from-github:
-	go get -u github.com/msoap/shell2http
+	go get -u github.com/msoap/$(APP_NAME)
 
 test:
 	go test -race -cover -v ./...
@@ -22,11 +28,22 @@ build-docker-image:
 	rocker build
 
 generate-manpage:
-	docker run -it --rm -v $$PWD:/app -w /app ruby-ronn sh -c 'cat README.md | grep -v "^\[" > shell2http.md; ronn shell2http.md; mv ./shell2http ./shell2http.1; rm ./shell2http.html ./shell2http.md'
+	cat README.md | grep -v "^\[" > $(APP_NAME).md
+	docker run --rm -v $$PWD:/app -w /app msoap/ruby-ronn ronn $(APP_NAME).md
+	mv ./$(APP_NAME) ./$(APP_NAME).1
+	rm ./$(APP_NAME).{md,html}
 
 create-debian-amd64-package:
-	GOOS=linux GOARCH=amd64 go build -ldflags="-w" -o shell2http
-	set -e ;\
-	TAG_NAME=$$(git tag 2>/dev/null | grep -E '^[0-9]+' | tail -1) ;\
-	docker run -it --rm -v $$PWD:/app -w /app -e TAG_NAME=$$TAG_NAME ruby-fpm sh -c 'fpm -s dir -t deb --name shell2http -v $$TAG_NAME ./shell2http=/usr/bin/ ./shell2http.1=/usr/share/man/man1/ LICENSE=/usr/share/doc/shell2http/copyright README.md=/usr/share/doc/shell2http/'
-	rm shell2http
+	GOOS=linux GOARCH=amd64 go build -ldflags="-w" -o $(APP_NAME)
+	docker run --rm -v $$PWD:/app -w /app msoap/ruby-fpm \
+		fpm -s dir -t deb --force --name $(APP_NAME) -v $(GIT_TAG) \
+			--license="$$(head -1 LICENSE)" \
+			--url=$(APP_URL) \
+			--description="$(APP_DESCRIPTION)" \
+			--maintainer="$(APP_MAINTAINER)" \
+			--category=network \
+			./$(APP_NAME)=/usr/bin/ \
+			./$(APP_NAME).1=/usr/share/man/man1/ \
+			LICENSE=/usr/share/doc/$(APP_NAME)/copyright \
+			README.md=/usr/share/doc/$(APP_NAME)/
+	rm $(APP_NAME)
