@@ -38,12 +38,8 @@ after_success:
 before_deploy:
   - curl -SL https://raw.githubusercontent.com/msoap/etc/master/golang-cross-build/golang-cross-build.sh > $GOPATH/bin/golang-cross-build.sh
   - chmod 700 $GOPATH/bin/golang-cross-build.sh
-  - golang-cross-build.sh $APP_NAME
   - gem install --no-ri --no-rdoc fpm
-  - GOOS=linux GOARCH=amd64 go build -ldflags="-w" -o $APP_NAME
-  - fpm -s dir -t deb --name $APP_NAME -v $TRAVIS_TAG ./$APP_NAME=/usr/bin/ ./$APP_NAME.1=/usr/share/man/man1/ LICENSE=/usr/share/doc/$APP_NAME/copyright README.md=/usr/share/doc/$APP_NAME/
-  - rm $APP_NAME
-  - shasum *.deb
+  - golang-cross-build.sh $APP_NAME
   - ls -l *.zip *.tar.gz *.deb
 
 deploy:
