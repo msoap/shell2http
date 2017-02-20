@@ -8,8 +8,8 @@ shell2http
 [![Homebrew formula exists](https://img.shields.io/badge/homebrew-🍺-d7af72.svg)](https://github.com/msoap/shell2http#install)
 [![Report Card](https://goreportcard.com/badge/github.com/msoap/shell2http)](https://goreportcard.com/report/github.com/msoap/shell2http)
 
-Executing shell commands via simple http server (written in Go language).
-Settings through 2 command line arguments, path and shell command.
+HTTP-server for executing shell commands. Designed for develop, prototype or remote control.
+Settings through two command line arguments, path and shell command.
 By default bind to :8080.
 
 Install
