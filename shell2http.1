@@ -4,41 +4,6 @@
 .TH "SHELL2HTTP" "" "February 2017" "" ""
 HTTP\-server for executing shell commands\. Designed for develop, prototype or remote control\. Settings through two command line arguments, path and shell command\. By default bind to :8080\.
 .
-.SH "Install"
-MacOS:
-.
-.IP "" 4
-.
-.nf
-
-brew tap msoap/tools
-brew install shell2http
-# update:
-brew upgrade shell2http
-.
-.fi
-.
-.IP "" 0
-.
-.P
-Or download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases\fR (OS X/Linux/Windows/RaspberryPi)
-.
-.P
-Or build from source:
-.
-.IP "" 4
-.
-.nf
-
-# install Go (brew install go \.\.\.)
-# set $GOPATH if needed
-go get \-u github\.com/msoap/shell2http
-ln \-s $GOPATH/bin/shell2http ~/bin/shell2http
-.
-.fi
-.
-.IP "" 0
-.
 .SH "Usage"
 .
 .nf
@@ -70,6 +35,40 @@ options:
     \-help
 .
 .fi
+.
+.SH "Install"
+MacOS:
+.
+.IP "" 4
+.
+.nf
+
+brew tap msoap/tools
+brew install shell2http
+# update:
+brew upgrade shell2http
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Or download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases\fR (OS X/Linux/Windows/RaspberryPi)
+.
+.P
+Or build from source:
+.
+.IP "" 4
+.
+.nf
+
+go get \-u github\.com/msoap/shell2http
+# set link to your PATH if needed:
+ln \-s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
+.
+.fi
+.
+.IP "" 0
 .
 .SH "Examples"
 .

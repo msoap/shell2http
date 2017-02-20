@@ -12,25 +12,6 @@ HTTP-server for executing shell commands. Designed for develop, prototype or rem
 Settings through two command line arguments, path and shell command.
 By default bind to :8080.
 
-Install
--------
-
-MacOS:
-
-    brew tap msoap/tools
-    brew install shell2http
-    # update:
-    brew upgrade shell2http
-
-Or download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
-
-Or build from source:
-
-    # install Go (brew install go ...)
-    # set $GOPATH if needed
-    go get -u github.com/msoap/shell2http
-    ln -s $GOPATH/bin/shell2http ~/bin/shell2http
-
 Usage
 -----
 
@@ -59,6 +40,24 @@ Usage
         -basic-auth=""  : setup HTTP Basic Authentication ("user_name:password")
         -version
         -help
+
+Install
+-------
+
+MacOS:
+
+    brew tap msoap/tools
+    brew install shell2http
+    # update:
+    brew upgrade shell2http
+
+Or download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
+
+Or build from source:
+
+    go get -u github.com/msoap/shell2http
+    # set link to your PATH if needed:
+    ln -s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
 
 Examples
 --------
