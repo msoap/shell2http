@@ -6,11 +6,11 @@ services:
 env:
   global:
     - APP_NAME=shell2http
-    - CURRENT_GO_VERSION="1.7"
+    - CURRENT_GO_VERSION="1.8"
 
 go:
-  - 1.6.x
   - 1.7.x
+  - 1.8.x
   - master
 
 before_install:
