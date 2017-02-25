@@ -74,7 +74,7 @@ shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br
 ```
 </details>
 
-<details><summary>get URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
+<details><summary>Get URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
 ```sh
 shell2http -form /form 'echo $v_from, $v_to'
 ```
@@ -88,20 +88,20 @@ shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"' # custom HTTP c
 ```
 </details>
 
-<details><summary>simple http-proxy server (for logging all URLs)</summary>
+<details><summary>Simple http-proxy server (for logging all URLs)</summary>
 setup proxy as "http://localhost:8080/"
 ```sh
 shell2http -log=/dev/null -cgi / 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
 ```
 </details>
 
-<details><summary>test slow connection (http://localhost:8080/slow?duration=10)</summary>
+<details><summary>Test slow connection (http://localhost:8080/slow?duration=10)</summary>
 ```sh
 shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 ```
 </details>
 
-<details><summary>proxy with cache in files (for debug with production API with rate limit)</summary>
+<details><summary>Proxy with cache in files (for debug with production API with rate limit)</summary>
 get `http://api.url/` as `http://localhost:8080/get?url=http://api.url/`
 ```sh
 shell2http -form \
@@ -110,7 +110,7 @@ shell2http -form \
 ```
 </details>
 
-<details><summary>remote sound volume control (Mac OS)</summary>
+<details><summary>Remote sound volume control (Mac OS)</summary>
 ```sh
 shell2http /get  'osascript -e "output volume of (get volume settings)"' \
            /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
@@ -118,14 +118,14 @@ shell2http /get  'osascript -e "output volume of (get volume settings)"' \
 ```
 </details>
 
-<details><summary>remote control for Vox.app player (Mac OS)</summary>
+<details><summary>Remote control for Vox.app player (Mac OS)</summary>
 ```sh
 shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
            /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
 ```
 </details>
 
-<details><summary>get four random OS X wallpapers</summary>
+<details><summary>Get four random OS X wallpapers</summary>
 ```sh
 shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
            /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
