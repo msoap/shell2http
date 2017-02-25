@@ -68,52 +68,77 @@ Examples
     shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
     shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
-### HTML calendar for current year
-    shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
+<details><summary>HTML calendar for current year</summary>
+```sh
+shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
+```
+</details>
 
-### get URL parameters (http://localhost:8080/form?from=10&to=100)
-    shell2http -form /form 'echo $v_from, $v_to'
+<details><summary>get URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
+```sh
+shell2http -form /form 'echo $v_from, $v_to'
+```
+</details>
 
-### CGI scripts
-    shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
-    # redirect
-    shell2http -cgi /set 'touch file; echo "Location: /\n"'
-    # custom HTTP code
-    shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
+<details><summary>CGI scripts</summary>
+```sh
+shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+shell2http -cgi /set 'touch file; echo "Location: /another_path\n"' # redirect
+shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"' # custom HTTP code
+```
+</details>
 
-### simple http-proxy server (for logging all URLs)
-    # setup proxy as "http://localhost:8080/"
-    shell2http -log=/dev/null -cgi / 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
+<details><summary>simple http-proxy server (for logging all URLs)</summary>
+setup proxy as "http://localhost:8080/"
+```sh
+shell2http -log=/dev/null -cgi / 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
+```
+</details>
 
-### test slow connection (http://localhost:8080/slow?duration=10)
-    shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
+<details><summary>test slow connection (http://localhost:8080/slow?duration=10)</summary>
+```sh
+shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
+```
+</details>
 
-### proxy with cache in files (for debug with production API with rate limit)
-    # get "http://localhost:8080/get?url=http://api.url/"
-    shell2http -form \
-        /form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
-        /get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
+<details><summary>proxy with cache in files (for debug with production API with rate limit)</summary>
+get `http://api.url/` as `http://localhost:8080/get?url=http://api.url/`
+```sh
+shell2http -form \
+    /form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
+    /get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
+```
+</details>
 
-### remote sound volume control (Mac OS)
-    shell2http /get  'osascript -e "output volume of (get volume settings)"' \
-               /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
-               /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
+<details><summary>remote sound volume control (Mac OS)</summary>
+```sh
+shell2http /get  'osascript -e "output volume of (get volume settings)"' \
+           /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
+           /down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
+```
+</details>
 
-### remote control for Vox.app player (Mac OS)
-    shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
-               /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
+<details><summary>remote control for Vox.app player (Mac OS)</summary>
+```sh
+shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
+           /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
+```
+</details>
 
-### get four random OS X wallpapers
-    shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
-               /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
+<details><summary>get four random OS X wallpapers</summary>
+```sh
+shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
+           /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
+```
+</details>
 
-[More examples](https://github.com/msoap/shell2http/wiki)
+[More examples ...](https://github.com/msoap/shell2http/wiki)
 
 Run from Docker-container
 -------------------------
 Example of `test.Dockerfile` for server for get current date:
 
-```
+```dockerfile
 FROM msoap/shell2http
 # may be install some alpine packages:
 # RUN apk add --no-cache ...
