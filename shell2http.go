@@ -332,18 +332,11 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			shellOut, err = osExecCommand.Output()
 		}
 
-		exitCode := 0
 		if err != nil {
 			log.Println("exec error: ", err)
-
-			// get exit code. May be works on POSIX-system only, need test on Windows
-			if exiterr, ok := err.(*exec.ExitError); ok {
-				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-					exitCode = status.ExitStatus()
-				}
-			}
 		}
-		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", exitCode))
+
+		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", getExitCode(err)))
 
 		if err != nil && !appConfig.showErrors {
 			responseWrite(rw, "exec error: "+err.Error())
@@ -389,6 +382,18 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 	}
 
 	return shellHandler
+}
+
+// ------------------------------------------------------------------
+// getExitCode - get exit code. May be works on POSIX-system only, need test on Windows
+func getExitCode(execErr error) int {
+	if exiterr, ok := execErr.(*exec.ExitError); ok {
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			return status.ExitStatus()
+		}
+	}
+
+	return 0
 }
 
 // ------------------------------------------------------------------
