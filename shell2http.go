@@ -97,7 +97,6 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -312,8 +311,30 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 			getForm(osExecCommand, req)
 		}
 
+		var (
+			waitPipeWrite bool
+			pipeErrCh     = make(chan error)
+		)
+
 		if appConfig.setCGI {
 			setCGIEnv(osExecCommand, req, appConfig)
+
+			// get POST data to stdin of script (if not parse form vars above)
+			if req.Method == "POST" && !appConfig.setForm {
+				if stdin, err := osExecCommand.StdinPipe(); err != nil {
+					log.Println("write POST data to shell failed:", err)
+				} else {
+					waitPipeWrite = true
+					go func() {
+						_, err := io.Copy(stdin, req.Body)
+						if err != nil {
+							pipeErrCh <- err
+							return
+						}
+						pipeErrCh <- stdin.Close()
+					}()
+				}
+			}
 		}
 
 		if appConfig.oneThread {
@@ -334,6 +355,11 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 
 		if err != nil {
 			log.Println("exec error: ", err)
+		}
+		if waitPipeWrite {
+			if pipeErr := <-pipeErrCh; pipeErr != nil {
+				log.Println("write POST data to shell failed:", pipeErr)
+			}
 		}
 
 		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", getExitCode(err)))
@@ -500,44 +526,6 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	for _, row := range CGIVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgiName, row.value))
 	}
-
-	// get POST data to stdin of script (if not parse form vars above)
-	if req.Method == "POST" && !appConfig.setForm {
-
-		var (
-			stdin    io.WriteCloser
-			postBody []byte
-		)
-		err := errChain(func() (err error) {
-			stdin, err = cmd.StdinPipe()
-			return err
-		}, func() (err error) {
-			postBody, err = ioutil.ReadAll(req.Body)
-			return err
-		}, func() error {
-			_, err := stdin.Write(postBody)
-			return err
-		}, func() error {
-			return stdin.Close()
-		})
-		if err != nil {
-			log.Println("get STDIN error: ", err)
-			return
-		}
-
-	}
-}
-
-// ------------------------------------------------------------------
-// errChain - handle errors on few functions
-func errChain(chainFuncs ...func() error) error {
-	for _, fn := range chainFuncs {
-		if err := fn(); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // ------------------------------------------------------------------
