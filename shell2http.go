@@ -466,15 +466,16 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			path: "/",
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
+				printAccessLogLine(req)
 				setCommonHeaders(rw)
+
 				if req.URL.Path != "/" {
-					log.Printf("404: %s", req.URL.Path)
+					log.Printf("%s - 404", req.URL.Path)
 					http.NotFound(rw, req)
 					return
 				}
-				printAccessLogLine(req)
-				responseWrite(rw, indexHTML)
 
+				responseWrite(rw, indexHTML)
 				return
 			},
 		})
