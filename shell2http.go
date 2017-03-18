@@ -290,76 +290,18 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 	mutex := sync.Mutex{}
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
-	shellHandler := func(rw http.ResponseWriter, req *http.Request) {
-		printAccessLogLine(req)
-		setCommonHeaders(rw)
-
-		if appConfig.cache > 0 {
-			if cacheData, err := cacheTTL.GetStr(req.RequestURI); err != raphanuscommon.ErrKeyNotExists && err != nil {
-				log.Print(err)
-			} else if err == nil {
-				// cache hit
-				responseWrite(rw, cacheData)
-				return
-			}
-		}
-
-		osExecCommand := exec.Command(shell, params...) // #nosec
-
-		proxySystemEnv(osExecCommand, appConfig)
-		if appConfig.setForm {
-			getForm(osExecCommand, req)
-		}
-
-		var (
-			waitPipeWrite bool
-			pipeErrCh     = make(chan error)
-		)
-
-		if appConfig.setCGI {
-			setCGIEnv(osExecCommand, req, appConfig)
-
-			// get POST data to stdin of script (if not parse form vars above)
-			if req.Method == "POST" && !appConfig.setForm {
-				if stdin, err := osExecCommand.StdinPipe(); err != nil {
-					log.Println("write POST data to shell failed:", err)
-				} else {
-					waitPipeWrite = true
-					go func() {
-						_, err := io.Copy(stdin, req.Body)
-						if err != nil {
-							pipeErrCh <- err
-							return
-						}
-						pipeErrCh <- stdin.Close()
-					}()
-				}
-			}
-		}
-
+	return func(rw http.ResponseWriter, req *http.Request) {
 		if appConfig.oneThread {
 			mutex.Lock()
 			defer mutex.Unlock()
 		}
 
-		var (
-			shellOut []byte
-			err      error
-		)
-		if appConfig.includeStderr {
-			shellOut, err = osExecCommand.CombinedOutput()
-		} else {
-			osExecCommand.Stderr = os.Stderr
-			shellOut, err = osExecCommand.Output()
-		}
+		printAccessLogLine(req)
+		setCommonHeaders(rw)
 
+		shellOut, err := execShellCommand(appConfig, path, shell, params, req, cacheTTL)
 		if err != nil {
 			log.Println("exec error: ", err)
-		}
-		if waitPipeWrite {
-			if pipeErr := <-pipeErrCh; pipeErr != nil {
-				log.Println("write POST data to shell failed:", pipeErr)
-			}
 		}
 
 		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", getExitCode(err)))
@@ -395,19 +337,80 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 					rw.WriteHeader(customStatusCode)
 				}
 			}
-			responseWrite(rw, outText)
 
-			if appConfig.cache > 0 {
-				if err := cacheTTL.SetStr(req.RequestURI, outText, appConfig.cache); err != nil {
-					log.Print(err)
-				}
-			}
+			responseWrite(rw, outText)
 		}
 
 		return
 	}
+}
 
-	return shellHandler
+// ------------------------------------------------------------------
+// execShellCommand - execute shell command, returns bytes out and error
+func execShellCommand(appConfig Config, path string, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, error) {
+	if appConfig.cache > 0 {
+		if cacheData, err := cacheTTL.GetBytes(req.RequestURI); err != raphanuscommon.ErrKeyNotExists && err != nil {
+			log.Printf("get from cache failed: %s", err)
+		} else if err == nil {
+			// cache hit
+			return cacheData, nil
+		}
+	}
+
+	osExecCommand := exec.Command(shell, params...) // #nosec
+
+	proxySystemEnv(osExecCommand, appConfig)
+	if appConfig.setForm {
+		getForm(osExecCommand, req)
+	}
+
+	var (
+		waitPipeWrite bool
+		pipeErrCh     = make(chan error)
+		shellOut      []byte
+		err           error
+	)
+
+	if appConfig.setCGI {
+		setCGIEnv(osExecCommand, req, appConfig)
+
+		// get POST data to stdin of script (if not parse form vars above)
+		if req.Method == "POST" && !appConfig.setForm {
+			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
+				log.Println("write POST data to shell failed:", pipeErr)
+			} else {
+				waitPipeWrite = true
+				go func() {
+					if _, pipeErr := io.Copy(stdin, req.Body); pipeErr != nil {
+						pipeErrCh <- pipeErr
+						return
+					}
+					pipeErrCh <- stdin.Close()
+				}()
+			}
+		}
+	}
+
+	if appConfig.includeStderr {
+		shellOut, err = osExecCommand.CombinedOutput()
+	} else {
+		osExecCommand.Stderr = os.Stderr
+		shellOut, err = osExecCommand.Output()
+	}
+
+	if waitPipeWrite {
+		if pipeErr := <-pipeErrCh; pipeErr != nil {
+			log.Println("write POST data to shell failed:", pipeErr)
+		}
+	}
+
+	if appConfig.cache > 0 {
+		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
+			log.Printf("set to cache failed: %s", cacheErr)
+		}
+	}
+
+	return shellOut, err
 }
 
 // ------------------------------------------------------------------
