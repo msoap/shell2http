@@ -29,13 +29,14 @@ Usage:
 		-add-exit       : add /exit command
 		-log=filename   : log filename, default - STDOUT
 		-shell="shell"  : shell for execute command, "" - without shell
-		-cache=NNN      : caching command out for NNN seconds
+		-cache=N        : caching command out for N seconds
 		-one-thread     : run each shell command in one thread
 		-show-errors    : show the standard output even if the command exits with a non-zero exit code
 		-include-stderr : include stderr to output (default is stdout only)
 		-cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
 		-key=key.pem    : SSL private key path
 		-basic-auth=""	: setup HTTP Basic Authentication ("user_name:password")
+		-timeout=N	    : set timeout for execute shell command (in seconds)
 		-version
 		-help
 
@@ -93,6 +94,7 @@ More examples on https://github.com/msoap/shell2http/wiki
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"html"
@@ -107,6 +109,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mattn/go-shellwords"
 	"github.com/msoap/raphanus"
@@ -150,6 +153,7 @@ type Command struct {
 type Config struct {
 	port          int    // server port
 	cache         int    // caching command out (in seconds)
+	timeout       int    // timeout for shell command (in seconds)
 	host          string // server host
 	exportVars    string // list of environment vars for export to script
 	shell         string // export all current environment vars
@@ -196,6 +200,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.StringVar(&appConfig.cert, "cert", "", "SSL certificate path (if specified -cert/-key options - run https server)")
 	flag.StringVar(&appConfig.key, "key", "", "SSL private key path")
 	flag.StringVar(&basicAuth, "basic-auth", "", "setup HTTP Basic Authentication (\"user_name:password\")")
+	flag.IntVar(&appConfig.timeout, "timeout", 0, "set timeout for execute shell command (in seconds)")
 
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
@@ -357,7 +362,13 @@ func execShellCommand(appConfig Config, path string, shell string, params []stri
 		}
 	}
 
-	osExecCommand := exec.Command(shell, params...) // #nosec
+	ctx := context.Background()
+	if appConfig.timeout > 0 {
+		var cancelFn context.CancelFunc
+		ctx, cancelFn = context.WithTimeout(ctx, time.Duration(appConfig.timeout)*time.Second)
+		defer cancelFn()
+	}
+	osExecCommand := exec.CommandContext(ctx, shell, params...) // #nosec
 
 	proxySystemEnv(osExecCommand, appConfig)
 	if appConfig.setForm {
