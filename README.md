@@ -31,13 +31,14 @@ Usage
         -add-exit       : add /exit command
         -log=filename   : log filename, default - STDOUT
         -shell="shell"  : shell for execute command, "" - without shell
-        -cache=NNN      : caching command out for NNN seconds
+        -cache=N        : caching command out for N seconds
         -one-thread     : run each shell command in one thread
         -show-errors    : show the standard output even if the command exits with a non-zero exit code
         -include-stderr : include stderr to output (default is stdout only)
         -cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
         -key=key.pem    : SSL private key path
         -basic-auth=""  : setup HTTP Basic Authentication ("user_name:password")
+        -timeout=N	    : set timeout for execute shell command (in seconds)
         -version
         -help
 
