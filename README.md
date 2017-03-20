@@ -70,18 +70,21 @@ Examples
     shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
 <details><summary>HTML calendar for current year</summary>
+
 ```sh
 shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 ```
 </details>
 
 <details><summary>Get URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
+
 ```sh
 shell2http -form /form 'echo $v_from, $v_to'
 ```
 </details>
 
 <details><summary>CGI scripts</summary>
+
 ```sh
 shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 shell2http -cgi /set 'touch file; echo "Location: /another_path\n"' # redirect
@@ -90,13 +93,15 @@ shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"' # custom HTTP c
 </details>
 
 <details><summary>Simple http-proxy server (for logging all URLs)</summary>
-setup proxy as "http://localhost:8080/"
+Setup proxy as "http://localhost:8080/"
+
 ```sh
 shell2http -log=/dev/null -cgi / 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
 ```
 </details>
 
 <details><summary>Test slow connection (http://localhost:8080/slow?duration=10)</summary>
+
 ```sh
 shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
 ```
@@ -104,6 +109,7 @@ shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} sec
 
 <details><summary>Proxy with cache in files (for debug with production API with rate limit)</summary>
 get `http://api.url/` as `http://localhost:8080/get?url=http://api.url/`
+
 ```sh
 shell2http -form \
     /form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
@@ -112,6 +118,7 @@ shell2http -form \
 </details>
 
 <details><summary>Remote sound volume control (Mac OS)</summary>
+
 ```sh
 shell2http /get  'osascript -e "output volume of (get volume settings)"' \
            /up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
@@ -120,6 +127,7 @@ shell2http /get  'osascript -e "output volume of (get volume settings)"' \
 </details>
 
 <details><summary>Remote control for Vox.app player (Mac OS)</summary>
+
 ```sh
 shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
            /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
@@ -127,6 +135,7 @@ shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && 
 </details>
 
 <details><summary>Get four random OS X wallpapers</summary>
+
 ```sh
 shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
            /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
