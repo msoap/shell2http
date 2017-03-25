@@ -37,7 +37,19 @@ const PORT = 8080
 const INDEXHTML = `<!DOCTYPE html>
 <html>
 <head>
-	<title>shell2http</title>
+    <title>❯ shell2http</title>
+    <style>
+    body {
+        font-family: sans-serif;
+    }
+    li {
+        list-style-type: none;
+    }
+    li:before {
+        content: "❯";
+        padding-right: 5px;
+    }
+    </style>
 </head>
 <body>
 	<h1>shell2http</h1>
