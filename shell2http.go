@@ -368,7 +368,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 		existsRootPath = existsRootPath || path == "/"
 
-		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
 		cmdHandlers[i].handler = getShellHandler(appConfig, path, shell, params, cacheTTL)
 	}
 
@@ -387,7 +387,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			},
 		})
 
-		indexLiHTML += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, "/exit", "/exit")
+		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a></li>`, "/exit", "/exit")
 	}
 
 	// --------------
