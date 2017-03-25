@@ -42,9 +42,9 @@ Usage:
 
 In the "-form" mode, variables are available for shell scripts:
 
- * $v_NNN -- data from query parameter with name "NNN" (example: `http://localhost:8080/path?NNN=123`)
- * $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
- * $filename_ID -- uploaded file name from browser
+ - $v_NNN -- data from query parameter with name "NNN" (example: `http://localhost:8080/path?NNN=123`)
+ - $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
+ - $filename_ID -- uploaded file name from browser
 
 Examples:
 	shell2http /top "top -l 1 | head -10"
