@@ -19,7 +19,7 @@ Usage
     options:
         -host="host"    : host for http server, default - all interfaces
         -port=NNNN      : port for http server, default - 8080
-        -form           : parse query into environment vars
+        -form           : parse query into environment vars, handle uploaded files
         -cgi            : run scripts in CGI-mode:
                           - set environment variables
                           - write POST-data to STDIN (if not set -form)
@@ -90,6 +90,20 @@ shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
 shell2http -cgi /set 'touch file; echo "Location: /another_path\n"' # redirect
 shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"' # custom HTTP code
 ```
+</details>
+
+<details><summary>Upload file</summary>
+
+```sh
+shell2http -form \
+    /form 'echo "<html><body><form method=POST action=/file enctype=multipart/form-data><input type=file name=uplfile><input type=submit></form>"' \
+    /file 'cat $filepath_uplfile > uploaded_file.dat; echo Ok'
+```
+
+Testing upload file with curl:
+
+    curl -i -F uplfile=@some/file/path 'http://localhost:8080/file'
+
 </details>
 
 <details><summary>Simple http-proxy server (for logging all URLs)</summary>

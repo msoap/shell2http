@@ -1,96 +1,3 @@
-/*
-Executing shell commands via simple http server.
-Settings through 2 command line arguments, path and shell command.
-By default bind to :8080.
-
-Install/update:
-	go get -u github.com/msoap/shell2http
-	ln -s $GOPATH/bin/shell2http ~/bin/shell2http
-
-MacOS install:
-	brew tap msoap/tools
-	brew install shell2http
-	# update:
-	brew upgrade shell2http
-
-Usage:
-	shell2http [options] /path "shell command" /path2 "shell command2" ...
-	options:
-		-host="host"    : host for http server, default - all interfaces
-		-port=NNNN      : port for http server, default - 8080
-		-form           : parse query into environment vars
-		-cgi            : run scripts in CGI-mode:
-		                  - set environment variables
-		                  - write POST-data to STDIN (if not set -form)
-		                  - parse headers from script (eg: "Location: URL\n\n")
-		-export-vars=var: export environment vars ("VAR1,VAR2,...")
-		-export-all-vars: export all current environment vars
-		-no-index       : dont generate index page
-		-add-exit       : add /exit command
-		-log=filename   : log filename, default - STDOUT
-		-shell="shell"  : shell for execute command, "" - without shell
-		-cache=N        : caching command out for N seconds
-		-one-thread     : run each shell command in one thread
-		-show-errors    : show the standard output even if the command exits with a non-zero exit code
-		-include-stderr : include stderr to output (default is stdout only)
-		-cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
-		-key=key.pem    : SSL private key path
-		-basic-auth=""	: setup HTTP Basic Authentication ("user_name:password")
-		-timeout=N	    : set timeout for execute shell command (in seconds)
-		-version
-		-help
-
-Examples:
-	shell2http /top "top -l 1 | head -10"
-	shell2http /date date /ps "ps aux"
-	shell2http -export-all-vars /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
-	shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
-	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
-	shell2http -form /form 'echo $v_from, $v_to'
-	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
-	shell2http -cgi /set 'touch file; echo "Location: /\n"'
-	shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
-	shell2http -export-vars=GOPATH /get 'echo $GOPATH'
-
-More complex examples:
-
-simple http-proxy server (for logging all URLs)
-	# setup proxy as "http://localhost:8080/"
-	shell2http \
-		-log=/dev/null \
-		-cgi \
-		/ 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" == "POST" ] && post_param="-d@-"; curl -sL $post_param "$REQUEST_URI" -A "$HTTP_USER_AGENT"'
-
-test slow connection
-	# http://localhost:8080/slow?duration=10
-	shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
-
-proxy with cache in files (for debug with production API with rate limit)
-	# get "http://localhost:8080/get?url=http://api.url/"
-	shell2http \
-		-form \
-		/form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
-		/get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
-
-remote sound volume control (Mac OS)
-	shell2http \
-		/get  'osascript -e "output volume of (get volume settings)"' \
-		/up   'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")+10))"' \
-		/down 'osascript -e "set volume output volume (($(osascript -e "output volume of (get volume settings)")-10))"'
-
-remote control for Vox.app player (Mac OS)
-	shell2http \
-		/play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
-		/get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
-
-get four random OS X wallpapers
-	shell2http \
-		/img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
-		/wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
-
-More examples on https://github.com/msoap/shell2http/wiki
-
-*/
 package main
 
 import (
@@ -99,7 +6,9 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"os/exec"
@@ -172,7 +81,8 @@ type Config struct {
 }
 
 const (
-	maxHTTPCode = 1000
+	maxHTTPCode            = 1000
+	maxMemoryForUploadFile = 65536
 )
 
 // ------------------------------------------------------------------
@@ -189,7 +99,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.BoolVar(&appConfig.setCGI, "cgi", false, "run scripts in CGI-mode")
 	flag.StringVar(&appConfig.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
 	flag.BoolVar(&appConfig.exportAllVars, "export-all-vars", false, "export all current environment vars")
-	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars")
+	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars, handle uploaded files")
 	flag.BoolVar(&appConfig.noIndex, "no-index", false, "dont generate index page")
 	flag.BoolVar(&appConfig.addExit, "add-exit", false, "add /exit command")
 	flag.StringVar(&appConfig.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
@@ -220,20 +130,20 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	if len(logFilename) > 0 {
 		fhLog, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 		if err != nil {
-			log.Fatalf("error opening log file: %v", err)
+			return nil, Config{}, fmt.Errorf("error opening log file: %v", err)
 		}
 		log.SetOutput(fhLog)
 	}
 
 	if len(appConfig.cert) > 0 && len(appConfig.key) == 0 ||
 		len(appConfig.cert) == 0 && len(appConfig.key) > 0 {
-		return nil, Config{}, fmt.Errorf("error: need both -cert and -key options")
+		return nil, Config{}, fmt.Errorf("requires both -cert and -key options")
 	}
 
 	if len(basicAuth) > 0 {
 		basicAuthParts := strings.SplitN(basicAuth, ":", 2)
 		if len(basicAuthParts) != 2 {
-			log.Fatalf("HTTP basic authentication must be in format: name:password")
+			return nil, Config{}, fmt.Errorf("HTTP basic authentication must be in format: name:password")
 		}
 		appConfig.authUser, appConfig.authPass = basicAuthParts[0], basicAuthParts[1]
 	}
@@ -241,13 +151,13 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
 	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, Config{}, fmt.Errorf("error: need pairs of path and shell command")
+		return nil, Config{}, fmt.Errorf("requires a pair of path and shell command")
 	}
 
 	for i := 0; i < len(args); i += 2 {
 		path, cmd := args[i], args[i+1]
 		if path[0] != '/' {
-			return nil, Config{}, fmt.Errorf("error: path %s dont starts with /", path)
+			return nil, Config{}, fmt.Errorf("the path %q does not begin with the prefix /", path)
 		}
 		cmdHandlers = append(cmdHandlers, Command{path: path, cmd: cmd})
 	}
@@ -371,8 +281,13 @@ func execShellCommand(appConfig Config, path string, shell string, params []stri
 	osExecCommand := exec.CommandContext(ctx, shell, params...) // #nosec
 
 	proxySystemEnv(osExecCommand, appConfig)
+
+	finalizer := func() {}
 	if appConfig.setForm {
-		getForm(osExecCommand, req)
+		var err error
+		if finalizer, err = getForm(osExecCommand, req); err != nil {
+			log.Printf("parse form failed: %s", err)
+		}
 	}
 
 	var (
@@ -414,6 +329,8 @@ func execShellCommand(appConfig Config, path string, shell string, params []stri
 			log.Println("write POST data to shell failed:", pipeErr)
 		}
 	}
+
+	finalizer()
 
 	if appConfig.cache > 0 {
 		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
@@ -578,17 +495,94 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 }
 
 // ------------------------------------------------------------------
-// getForm - parse form into environment vars
-func getForm(cmd *exec.Cmd, req *http.Request) {
-	err := req.ParseForm()
-	if err != nil {
-		log.Println(err)
-		return
+// getForm - parse form into environment vars, also handle uploaded files
+func getForm(cmd *exec.Cmd, req *http.Request) (func(), error) {
+	tempDir := ""
+	safeFileNameRe := regexp.MustCompile(`[^\.\w\-]+`)
+	finalizer := func() {
+		if tempDir != "" {
+			if err := os.RemoveAll(tempDir); err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	if err := req.ParseForm(); err != nil {
+		return finalizer, err
+	}
+
+	if isMultipartFormData(req.Header) {
+		if err := req.ParseMultipartForm(maxMemoryForUploadFile); err != nil {
+			return finalizer, err
+		}
 	}
 
 	for key, value := range req.Form {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+key, strings.Join(value, ",")))
 	}
+
+	// handle uploaded files, save all to temporary files and set variables filename_XXX, filepath_XXX
+	if req.MultipartForm != nil {
+		for key, value := range req.MultipartForm.File {
+			if len(value) == 1 {
+				var (
+					uplFile     multipart.File
+					outFile     *os.File
+					err         error
+					reqFileName = value[0].Filename
+				)
+
+				errCreate := errChain(func() error {
+					uplFile, err = value[0].Open()
+					return err
+				}, func() error {
+					tempDir, err = ioutil.TempDir("", "shell2http_")
+					return err
+				}, func() error {
+					prefix := safeFileNameRe.ReplaceAllString(reqFileName, "")
+					outFile, err = ioutil.TempFile(tempDir, prefix+"_")
+					return err
+				}, func() error {
+					_, err = io.Copy(outFile, uplFile)
+					return err
+				})
+
+				errClose := errChainAll(func() error {
+					if uplFile != nil {
+						return uplFile.Close()
+					}
+					return nil
+				}, func() error {
+					if outFile != nil {
+						return outFile.Close()
+					}
+					return nil
+				})
+				if errClose != nil {
+					return finalizer, errClose
+				}
+
+				if errCreate != nil {
+					return finalizer, errCreate
+				}
+
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "filepath_"+key, outFile.Name()))
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "filename_"+key, reqFileName))
+			}
+		}
+	}
+
+	return finalizer, nil
+}
+
+// ------------------------------------------------------------------
+// isMultipartFormData - check header for multipart/form-data
+func isMultipartFormData(headers http.Header) bool {
+	if contentType, ok := headers["Content-Type"]; ok && len(contentType) == 1 && strings.HasPrefix(contentType[0], "multipart/form-data; ") {
+		return true
+	}
+
+	return false
 }
 
 // ------------------------------------------------------------------
@@ -635,6 +629,29 @@ func basicAuthWrapper(handler http.HandlerFunc, user, pass string) http.HandlerF
 
 		handler(rw, req)
 	}
+}
+
+// errChain - handle errors on few functions
+func errChain(chainFuncs ...func() error) error {
+	for _, fn := range chainFuncs {
+		if err := fn(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// errChainAll - handle errors on few functions, exec all func and returns the first error
+func errChainAll(chainFuncs ...func() error) error {
+	var resErr error
+	for _, fn := range chainFuncs {
+		if err := fn(); err != nil {
+			resErr = err
+		}
+	}
+
+	return resErr
 }
 
 // ------------------------------------------------------------------

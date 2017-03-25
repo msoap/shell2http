@@ -12,7 +12,7 @@ shell2http [options] /path "shell command" /path2 "shell command2" \.\.\.
 options:
     \-host="host"    : host for http server, default \- all interfaces
     \-port=NNNN      : port for http server, default \- 8080
-    \-form           : parse query into environment vars
+    \-form           : parse query into environment vars, handle uploaded files
     \-cgi            : run scripts in CGI\-mode:
                       \- set environment variables
                       \- write POST\-data to STDIN (if not set \-form)
@@ -83,9 +83,7 @@ shell2http \-export\-vars=GOPATH /get \'echo $GOPATH\'
 .
 .fi
 .
-.P
-.
-.IP "" 4
+.SS "HTML calendar for current year"
 .
 .nf
 
@@ -93,13 +91,9 @@ shell2http /cal_html \'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><b
 .
 .fi
 .
-.IP "" 0
-.
 .P
 .
-.P
-.
-.IP "" 4
+.SS "Get URL parameters (http://localhost:8080/form?from=10&to=100)"
 .
 .nf
 
@@ -107,13 +101,9 @@ shell2http \-form /form \'echo $v_from, $v_to\'
 .
 .fi
 .
-.IP "" 0
-.
 .P
 .
-.P
-.
-.IP "" 4
+.SS "CGI scripts"
 .
 .nf
 
@@ -123,11 +113,35 @@ shell2http \-cgi /404 \'echo "Status: 404"; echo; echo "404 page"\' # custom HTT
 .
 .fi
 .
+.P
+.
+.SS "Upload file"
+.
+.nf
+
+shell2http \-form \e
+    /form \'echo "<html><body><form method=POST action=/file enctype=multipart/form\-data><input type=file name=uplfile><input type=submit></form>"\' \e
+    /file \'cat $filepath_uplfile > uploaded_file\.dat; echo Ok\'
+.
+.fi
+.
+.P
+Testing upload file with curl:
+.
+.IP "" 4
+.
+.nf
+
+curl \-i \-F uplfile=@some/file/path \'http://localhost:8080/file\'
+.
+.fi
+.
 .IP "" 0
 .
 .P
 .
-.P
+.SS "Simple http\-proxy server (for logging all URLs)"
+Setup proxy as "http://localhost:8080/"
 .
 .IP "" 4
 .
@@ -141,9 +155,7 @@ shell2http \-log=/dev/null \-cgi / \'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD"
 .
 .P
 .
-.P
-.
-.IP "" 4
+.SS "Test slow connection (http://localhost:8080/slow?duration=10)"
 .
 .nf
 
@@ -151,11 +163,10 @@ shell2http \-form /slow \'sleep ${v_duration:\-1}; echo "sleep ${v_duration:\-1}
 .
 .fi
 .
-.IP "" 0
-.
 .P
 .
-.P
+.SS "Proxy with cache in files (for debug with production API with rate limit)"
+get \fBhttp://api\.url/\fR as \fBhttp://localhost:8080/get?url=http://api\.url/\fR
 .
 .IP "" 4
 .
@@ -171,9 +182,7 @@ shell2http \-form \e
 .
 .P
 .
-.P
-.
-.IP "" 4
+.SS "Remote sound volume control (Mac OS)"
 .
 .nf
 
@@ -183,13 +192,9 @@ shell2http /get  \'osascript \-e "output volume of (get volume settings)"\' \e
 .
 .fi
 .
-.IP "" 0
-.
 .P
 .
-.P
-.
-.IP "" 4
+.SS "Remote control for Vox\.app player (Mac OS)"
 .
 .nf
 
@@ -198,13 +203,9 @@ shell2http /play_pause \'osascript \-e "tell application \e"Vox\e" to playpause"
 .
 .fi
 .
-.IP "" 0
-.
 .P
 .
-.P
-.
-.IP "" 4
+.SS "Get four random OS X wallpapers"
 .
 .nf
 
@@ -212,8 +213,6 @@ shell2http /img \'cat "$(ls "/Library/Desktop Pictures/"*\.jpg | ruby \-e "puts 
            /wallpapers \'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs \-I@ echo "<img src=/img?@ width=500>"\'
 .
 .fi
-.
-.IP "" 0
 .
 .P
 .
