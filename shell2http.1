@@ -14,8 +14,8 @@ options:
     \-port=NNNN      : port for http server, default \- 8080
     \-form           : parse query into environment vars, handle uploaded files
     \-cgi            : run scripts in CGI\-mode:
-                      \- set environment variables
-                      \- write POST\-data to STDIN (if not set \-form)
+                      \- set environment variables with HTTP\-request information
+                      \- write POST\-data to script STDIN (if not set \-form)
                       \- parse headers from script (eg: "Location: URL\en\en")
     \-export\-vars=var: export environment vars ("VAR1,VAR2,\.\.\.")
                       by default export PATH, HOME, LANG, USER, TMPDIR
@@ -36,6 +36,20 @@ options:
     \-help
 .
 .fi
+.
+.P
+In the \fB\-form\fR mode, variables are available for shell scripts:
+.
+.IP "\(bu" 4
+$v_NNN \-\- data from query parameter with name "NNN" (example: \fBhttp://localhost:8080/path?NNN=123\fR)
+.
+.IP "\(bu" 4
+$filepath_ID \-\- uploaded file path, ID \- id from \fB<input type=file name=ID>\fR, temporary uploaded file will be automatically deleted
+.
+.IP "\(bu" 4
+$filename_ID \-\- uploaded file name from browser
+.
+.IP "" 0
 .
 .SH "Install"
 MacOS:

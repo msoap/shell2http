@@ -20,8 +20,8 @@ Usage:
 		-port=NNNN      : port for http server, default - 8080
 		-form           : parse query into environment vars, handle uploaded files
 		-cgi            : run scripts in CGI-mode:
-		                  - set environment variables
-		                  - write POST-data to STDIN (if not set -form)
+		                  - set environment variables with HTTP-request information
+		                  - write POST-data to script STDIN (if not set -form)
 		                  - parse headers from script (eg: "Location: URL\n\n")
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
 		-export-all-vars: export all current environment vars
@@ -39,6 +39,12 @@ Usage:
 		-timeout=N	    : set timeout for execute shell command (in seconds)
 		-version
 		-help
+
+In the "-form" mode, variables are available for shell scripts:
+
+  - $v_NNN -- data from query parameter with name "NNN" (example: `http://localhost:8080/path?NNN=123`)
+  - $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
+  - $filename_ID -- uploaded file name from browser
 
 Examples:
 	shell2http /top "top -l 1 | head -10"
