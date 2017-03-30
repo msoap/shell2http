@@ -162,6 +162,14 @@ shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STD
 ```
 </details>
 
+<details><summary>Mock service with JSON API</summary>
+
+```sh
+curl "http://some-service/v1/call1" > 1.json
+shell2http -cgi /call1 'cat 1.json' /call2 'echo "Content-Type: application/json;\n"; echo "{\"error\": \"ok\"}"'
+```
+</details>
+
 [More examples ...](https://github.com/msoap/shell2http/wiki)
 
 Run from Docker-container

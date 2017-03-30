@@ -230,6 +230,17 @@ shell2http /img \'cat "$(ls "/Library/Desktop Pictures/"*\.jpg | ruby \-e "puts 
 .
 .P
 .
+.SS "Mock service with JSON API"
+.
+.nf
+
+curl "http://some\-service/v1/call1" > 1\.json
+shell2http \-cgi /call1 \'cat 1\.json\' /call2 \'echo "Content\-Type: application/json;\en"; echo "{\e"error\e": \e"ok\e"}"\'
+.
+.fi
+.
+.P
+.
 .SH "Run from Docker\-container"
 Example of \fBtest\.Dockerfile\fR for server for get current date:
 .
