@@ -14,7 +14,6 @@ go:
   - master
 
 before_install:
-  - docker version
   - go get github.com/mattn/goveralls
   - go get github.com/philwinder/gocoverage
   - go get github.com/kisielk/errcheck
