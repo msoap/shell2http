@@ -206,7 +206,7 @@ func getShellAndParams(cmd string, customShell string, isWindows bool) (shell st
 func printAccessLogLine(req *http.Request) {
 	remoteAddr := req.RemoteAddr
 	if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
-		remoteAddr += ", " + realIP[0]
+		remoteAddr = realIP[0] + ", " + remoteAddr
 	}
 	log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
 }
