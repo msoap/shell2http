@@ -193,7 +193,7 @@ SSL
 
 Run https server:
 
-    shell2telegram -cert=./cert.pem -key=./key.pem ...
+    shell2http -cert=./cert.pem -key=./key.pem ...
 
 Generate self-signed certificate:
 
