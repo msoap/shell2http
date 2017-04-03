@@ -48,6 +48,8 @@ In the `-form` mode, variables are available for shell scripts:
   * $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
   * $filename_ID -- uploaded file name from browser
 
+The credentials for basic authentication may also be provided via the `SH_BASIC_AUTH` environment variable.
+
 Install
 -------
 
