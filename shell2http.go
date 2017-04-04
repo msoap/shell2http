@@ -31,6 +31,9 @@ const VERSION = "1.9"
 // PORT - default port for http-server
 const PORT = 8080
 
+// SH_BASIC_AUTH - name of env var for basic auth credentials
+const SH_BASIC_AUTH = "SH_BASIC_AUTH"
+
 // ------------------------------------------------------------------
 
 // INDEXHTML - Template for index page
@@ -152,10 +155,14 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		return nil, Config{}, fmt.Errorf("requires both -cert and -key options")
 	}
 
+	if basicAuth == "" && len(os.Getenv(SH_BASIC_AUTH)) > 0 {
+		basicAuth = os.Getenv(SH_BASIC_AUTH)
+	}
+
 	if len(basicAuth) > 0 {
 		basicAuthParts := strings.SplitN(basicAuth, ":", 2)
 		if len(basicAuthParts) != 2 {
-			return nil, Config{}, fmt.Errorf("HTTP basic authentication must be in format: name:password")
+			return nil, Config{}, fmt.Errorf("HTTP basic authentication must be in format: name:password, got: %s", basicAuth)
 		}
 		appConfig.authUser, appConfig.authPass = basicAuthParts[0], basicAuthParts[1]
 	}
@@ -608,12 +615,14 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 
 	for _, envRaw := range os.Environ() {
 		env := strings.SplitN(envRaw, "=", 2)
-		if appConfig.exportAllVars {
-			cmd.Env = append(cmd.Env, envRaw)
-		} else {
-			for _, envVarName := range varsNames {
-				if env[0] == envVarName {
-					cmd.Env = append(cmd.Env, envRaw)
+		if env[0] != SH_BASIC_AUTH {
+			if appConfig.exportAllVars {
+				cmd.Env = append(cmd.Env, envRaw)
+			} else {
+				for _, envVarName := range varsNames {
+					if env[0] == envVarName {
+						cmd.Env = append(cmd.Env, envRaw)
+					}
 				}
 			}
 		}
