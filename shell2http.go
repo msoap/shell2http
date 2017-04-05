@@ -31,8 +31,8 @@ const VERSION = "1.9"
 // PORT - default port for http-server
 const PORT = 8080
 
-// SH_BASIC_AUTH - name of env var for basic auth credentials
-const SH_BASIC_AUTH = "SH_BASIC_AUTH"
+// shBasicAuthVar - name of env var for basic auth credentials
+const shBasicAuthVar = "SH_BASIC_AUTH"
 
 // ------------------------------------------------------------------
 
@@ -155,8 +155,8 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		return nil, Config{}, fmt.Errorf("requires both -cert and -key options")
 	}
 
-	if basicAuth == "" && len(os.Getenv(SH_BASIC_AUTH)) > 0 {
-		basicAuth = os.Getenv(SH_BASIC_AUTH)
+	if basicAuth == "" && len(os.Getenv(shBasicAuthVar)) > 0 {
+		basicAuth = os.Getenv(shBasicAuthVar)
 	}
 
 	if len(basicAuth) > 0 {
@@ -615,7 +615,7 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 
 	for _, envRaw := range os.Environ() {
 		env := strings.SplitN(envRaw, "=", 2)
-		if env[0] != SH_BASIC_AUTH {
+		if env[0] != shBasicAuthVar {
 			if appConfig.exportAllVars {
 				cmd.Env = append(cmd.Env, envRaw)
 			} else {
