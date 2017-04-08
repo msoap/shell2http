@@ -17,7 +17,6 @@ before_install:
   - go get github.com/mattn/goveralls
   - go get github.com/philwinder/gocoverage
   - go get github.com/kisielk/errcheck
-  - curl -SL https://github.com/grammarly/rocker/releases/download/1.3.0/rocker_linux_amd64.tar.gz | tar -xzC $GOPATH/bin
 
 install: go get -t ./...
 
@@ -32,17 +31,19 @@ script:
 
 after_success:
   - if [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ $TRAVIS_EVENT_TYPE == "push" ]]; then
-      docker login -u="$DOCKER_USERNAME" -p="$(echo $DOCKER_PASSWORD | base64 -d)";
-      docker login -u="$QUAY_USERNAME" -p="$QUAY_PASSWORD" quay.io;
-      rocker build --pull;
-      docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:latest;
-      docker push $DOCKER_USERNAME/$APP_NAME:latest;
-      docker push quay.io/$DOCKER_USERNAME/$APP_NAME:latest;
+      docker login -u="$DOCKER_USERNAME" -p="$(echo $DOCKER_PASSWORD | base64 -d)" &&
+      docker login -u="$QUAY_USERNAME" -p="$QUAY_PASSWORD" quay.io &&
+      docker run --rm -v $PWD:/go/src/$APP_NAME -w /go/src/$APP_NAME golang:alpine sh -c "apk add --no-cache git && go get ./... && go build -o $APP_NAME" &&
+      docker build -t $DOCKER_USERNAME/$APP_NAME:latest . &&
+      docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:latest &&
+      docker push $DOCKER_USERNAME/$APP_NAME:latest &&
+      docker push quay.io/$DOCKER_USERNAME/$APP_NAME:latest &&
+      rm $APP_NAME;
     fi
   - if [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ ! -z $TRAVIS_TAG ]]; then
-      docker tag $DOCKER_USERNAME/$APP_NAME:latest $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
-      docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
-      docker push $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
+      docker tag $DOCKER_USERNAME/$APP_NAME:latest $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
+      docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
+      docker push $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
       docker push quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
     fi
 
