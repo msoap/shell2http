@@ -22,7 +22,7 @@ lint:
 	errcheck ./...
 
 gometalinter:
-	gometalinter --vendor --cyclo-over=20 --line-length=150 --dupl-threshold=150 --min-occurrences=3 --enable=misspell --deadline=10m
+	gometalinter --vendor --cyclo-over=20 --line-length=150 --dupl-threshold=150 --min-occurrences=3 --enable=misspell --deadline=10m --exclude=SA1022
 
 build-docker-image:
 	rocker build
