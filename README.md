@@ -194,7 +194,7 @@ Build and run container:
     docker build -f test.Dockerfile -t date-server .
     docker run --rm -p 8080:8080 date-server
 
-Mirror [repository](https://quay.io/repository/msoap/shell2http): quay.io/msoap/shell2http:latest
+Mirror docker [repository](https://quay.io/repository/msoap/shell2http): `quay.io/msoap/shell2http:latest`
 
 SSL
 ---
