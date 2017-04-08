@@ -32,10 +32,18 @@ script:
 
 after_success:
   - if [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ $TRAVIS_EVENT_TYPE == "push" ]]; then
-      rocker build --auth "$DOCKER_USERNAME:$(echo $DOCKER_PASSWORD | base64 -d)" --pull --meta --push;
+      docker login -u="$DOCKER_USERNAME" -p="$(echo $DOCKER_PASSWORD | base64 -d)";
       docker login -u="$QUAY_USERNAME" -p="$QUAY_PASSWORD" quay.io;
+      rocker build --pull;
       docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:latest;
+      docker push $DOCKER_USERNAME/$APP_NAME:latest;
       docker push quay.io/$DOCKER_USERNAME/$APP_NAME:latest;
+    fi
+  - if [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ ! -z $TRAVIS_TAG ]]; then
+      docker tag $DOCKER_USERNAME/$APP_NAME:latest $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
+      docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
+      docker push $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
+      docker push quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
     fi
 
 before_deploy:
