@@ -88,6 +88,19 @@ ln \-s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
 .
 .IP "" 0
 .
+.P
+Docker users:
+.
+.IP "" 4
+.
+.nf
+
+docker pull msoap/shell2http
+.
+.fi
+.
+.IP "" 0
+.
 .SH "Examples"
 .
 .nf
@@ -273,6 +286,9 @@ docker run \-\-rm \-p 8080:8080 date\-server
 .fi
 .
 .IP "" 0
+.
+.P
+Mirror repository \fIhttps://quay\.io/repository/msoap/shell2http\fR: quay\.io/msoap/shell2http:latest
 .
 .SH "SSL"
 Run https server:
