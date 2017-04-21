@@ -44,7 +44,7 @@ after_success:
         docker push $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
         docker push quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
       fi;
-      rm -f ${APP_NAME};
+      rm -f $APP_NAME;
     fi
 
 before_deploy:
