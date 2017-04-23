@@ -30,7 +30,7 @@ script:
     fi
 
 after_success:
-  - if [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ $TRAVIS_BRANCH == "master" || ! -z $TRAVIS_TAG ]] && [[ $TRAVIS_EVENT_TYPE == "push" ]]; then
+  - if [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ $TRAVIS_BRANCH == "master" || -n $TRAVIS_TAG ]] && [[ $TRAVIS_EVENT_TYPE == "push" ]]; then
       docker login -u="$DOCKER_USERNAME" -p="$(echo $DOCKER_PASSWORD | base64 -d)" &&
       docker login -u="$QUAY_USERNAME" -p="$QUAY_PASSWORD" quay.io &&
       docker run --rm -v $PWD:/go/src/$APP_NAME -w /go/src/$APP_NAME golang:alpine sh -c "apk add --no-cache git && go get ./... && go build -ldflags='-w -s' -o $APP_NAME" &&
@@ -38,7 +38,7 @@ after_success:
       docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:latest &&
       docker push $DOCKER_USERNAME/$APP_NAME:latest &&
       docker push quay.io/$DOCKER_USERNAME/$APP_NAME:latest;
-      if [[ ! -z $TRAVIS_TAG ]]; then
+      if [[ -n $TRAVIS_TAG ]]; then
         docker tag $DOCKER_USERNAME/$APP_NAME:latest $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
         docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
         docker push $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
