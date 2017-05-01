@@ -2,7 +2,7 @@ APP_NAME := shell2http
 APP_DESCRIPTION := $$(awk 'NR == 11, NR == 13' README.md)
 APP_URL := https://github.com/msoap/$(APP_NAME)
 APP_MAINTAINER := $$(git show HEAD | awk '$$1 == "Author:" {print $$2 " " $$3 " " $$4}')
-GIT_TAG := $$(git tag --sort=version:refname | tail -1)
+GIT_TAG := $$(git describe --tags --abbrev=0)
 
 run:
 	go run shell2http.go -add-exit -cgi /date date /env 'printenv | sort'
@@ -36,7 +36,7 @@ generate-manpage:
 	rm ./$(APP_NAME).{md,html}
 
 create-debian-amd64-package:
-	GOOS=linux GOARCH=amd64 go build -ldflags="-w" -o $(APP_NAME)
+	GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o $(APP_NAME)
 	docker run --rm -v $$PWD:/app -w /app msoap/ruby-fpm \
 		fpm -s dir -t deb --force --name $(APP_NAME) -v $(GIT_TAG) \
 			--license="$$(head -1 LICENSE)" \
