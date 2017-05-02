@@ -30,7 +30,7 @@ Usage
         -no-index       : dont generate index page
         -add-exit       : add /exit command
         -log=filename   : log filename, default - STDOUT
-        -shell="shell"  : shell for execute command, "" - without shell
+        -shell="shell"  : shell for execute command, "" - without shell (default "sh")
         -cache=N        : caching command out for N seconds
         -one-thread     : run each shell command in one thread
         -show-errors    : show the standard output even if the command exits with a non-zero exit code
