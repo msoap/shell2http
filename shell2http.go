@@ -80,7 +80,7 @@ type Config struct {
 	timeout       int    // timeout for shell command (in seconds)
 	host          string // server host
 	exportVars    string // list of environment vars for export to script
-	shell         string // export all current environment vars
+	shell         string // custom shell
 	cert          string // SSL certificate
 	key           string // SSL private key path
 	authUser      string // basic authentication user name
