@@ -26,7 +26,7 @@ import (
 )
 
 // VERSION - version
-const VERSION = "1.9"
+const VERSION = "1.10"
 
 // PORT - default port for http-server
 const PORT = 8080
