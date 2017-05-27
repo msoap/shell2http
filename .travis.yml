@@ -17,6 +17,9 @@ before_install:
   - go get github.com/mattn/goveralls
   - go get github.com/philwinder/gocoverage
   - go get github.com/kisielk/errcheck
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-engine
+  - docker version
 
 install: go get -t ./...
 
@@ -33,7 +36,6 @@ after_success:
   - if [[ $TRAVIS_GO_VERSION =~ $CURRENT_GO_VERSION ]] && [[ $TRAVIS_BRANCH == "master" || -n $TRAVIS_TAG ]] && [[ $TRAVIS_EVENT_TYPE == "push" ]]; then
       docker login -u="$DOCKER_USERNAME" -p="$(echo $DOCKER_PASSWORD | base64 -d)" &&
       docker login -u="$QUAY_USERNAME" -p="$QUAY_PASSWORD" quay.io &&
-      docker run --rm -v $PWD:/go/src/$APP_NAME -w /go/src/$APP_NAME golang:alpine sh -c "apk add --no-cache git && go get ./... && go build -ldflags='-w -s' -o $APP_NAME" &&
       docker build -t $DOCKER_USERNAME/$APP_NAME:latest . &&
       docker tag $DOCKER_USERNAME/$APP_NAME:latest quay.io/$DOCKER_USERNAME/$APP_NAME:latest &&
       docker push $DOCKER_USERNAME/$APP_NAME:latest &&
