@@ -34,6 +34,12 @@ const PORT = 8080
 // shBasicAuthVar - name of env var for basic auth credentials
 const shBasicAuthVar = "SH_BASIC_AUTH"
 
+// defaultShellPOSIX - shell executable by default in POSIX systems
+const defaultShellPOSIX = "sh"
+
+// defaultShellWindows - shell executable by default in Windows
+const defaultShellWindows = "cmd"
+
 // ------------------------------------------------------------------
 
 // INDEXHTML - Template for index page
@@ -81,6 +87,8 @@ type Config struct {
 	host          string // server host
 	exportVars    string // list of environment vars for export to script
 	shell         string // custom shell
+	defaultShell  string // shell by default
+	defaultShOpt  string // shell option for one-liner (-c or /C)
 	cert          string // SSL certificate
 	key           string // SSL private key path
 	authUser      string // basic authentication user name
@@ -108,6 +116,13 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		basicAuth   string
 	)
 
+	if runtime.GOOS != "windows" {
+		// What about Plan9?!
+		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellPOSIX, "-c"
+	} else {
+		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellWindows, "/C"
+	}
+
 	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
 	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
 	flag.StringVar(&appConfig.host, "host", "", "host for http server")
@@ -117,7 +132,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars, handle uploaded files")
 	flag.BoolVar(&appConfig.noIndex, "no-index", false, "dont generate index page")
 	flag.BoolVar(&appConfig.addExit, "add-exit", false, "add /exit command")
-	flag.StringVar(&appConfig.shell, "shell", "sh", "custom shell or \"\" for execute without shell")
+	flag.StringVar(&appConfig.shell, "shell", appConfig.defaultShell, `custom shell or "" for execute without shell`)
 	flag.IntVar(&appConfig.cache, "cache", 0, "caching command out (in seconds)")
 	flag.BoolVar(&appConfig.oneThread, "one-thread", false, "run each shell command in one thread")
 	flag.BoolVar(&appConfig.showErrors, "show-errors", false, "show the standard output even if the command exits with a non-zero exit code")
@@ -167,6 +182,12 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		appConfig.authUser, appConfig.authPass = basicAuthParts[0], basicAuthParts[1]
 	}
 
+	if appConfig.shell != "" && appConfig.shell != appConfig.defaultShell {
+		if _, err := exec.LookPath(appConfig.shell); err != nil {
+			return nil, Config{}, fmt.Errorf("an error has occurred while searching for shell executable %q: %s", appConfig.shell, err)
+		}
+	}
+
 	// need >= 2 arguments and count of it must be even
 	args := flag.Args()
 	if len(args) < 2 || len(args)%2 == 1 {
@@ -186,17 +207,14 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 
 // ------------------------------------------------------------------
 // getShellAndParams - get default shell and command
-func getShellAndParams(cmd string, customShell string, isWindows bool) (shell string, params []string, err error) {
-	shell, params = "sh", []string{"-c", cmd}
-	if isWindows {
-		shell, params = "cmd", []string{"/C", cmd}
-	}
+func getShellAndParams(cmd string, appConfig Config) (shell string, params []string, err error) {
+	shell, params = appConfig.defaultShell, []string{appConfig.defaultShOpt, cmd} // sh -c "cmd"
 
 	// custom shell
 	switch {
-	case customShell != "sh" && customShell != "":
-		shell = customShell
-	case customShell == "":
+	case appConfig.shell != appConfig.defaultShell && appConfig.shell != "":
+		shell = appConfig.shell
+	case appConfig.shell == "":
 		cmdLine, err := shellwords.Parse(cmd)
 		if err != nil {
 			return shell, params, fmt.Errorf("Parse '%s' failed: %s", cmd, err)
@@ -380,7 +398,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 	for i, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
-		shell, params, err := getShellAndParams(cmd, appConfig.shell, runtime.GOOS == "windows")
+		shell, params, err := getShellAndParams(cmd, appConfig)
 		if err != nil {
 			return nil, err
 		}
