@@ -40,6 +40,9 @@ const defaultShellPOSIX = "sh"
 // defaultShellWindows - shell executable by default in Windows
 const defaultShellWindows = "cmd"
 
+// defaultShellPlan9 - shell executable by default in Plan9
+const defaultShellPlan9 = "rc"
+
 // ------------------------------------------------------------------
 
 // INDEXHTML - Template for index page
@@ -116,11 +119,13 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		basicAuth   string
 	)
 
-	if runtime.GOOS != "windows" {
-		// What about Plan9?!
-		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellPOSIX, "-c"
-	} else {
+	switch runtime.GOOS {
+	case "plan9":
+		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellPlan9, "-c"
+	case "windows":
 		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellWindows, "/C"
+	default:
+		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellPOSIX, "-c"
 	}
 
 	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
