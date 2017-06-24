@@ -707,7 +707,7 @@ func main() {
 
 	var cacheTTL raphanus.DB
 	if appConfig.cache > 0 {
-		cacheTTL = raphanus.New("", 0)
+		cacheTTL = raphanus.New()
 	}
 
 	cmdHandlers, err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
