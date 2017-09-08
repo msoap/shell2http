@@ -314,7 +314,7 @@ func execShellCommand(appConfig Config, path string, shell string, params []stri
 		}
 	}
 
-	ctx := context.Background()
+	ctx := req.Context()
 	if appConfig.timeout > 0 {
 		var cancelFn context.CancelFunc
 		ctx, cancelFn = context.WithTimeout(ctx, time.Duration(appConfig.timeout)*time.Second)
