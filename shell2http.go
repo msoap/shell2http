@@ -297,8 +297,6 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 
 			responseWrite(rw, outText)
 		}
-
-		return
 	}
 }
 
@@ -424,8 +422,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 				setCommonHeaders(rw)
 				responseWrite(rw, "Bye...")
 				go os.Exit(0)
-
-				return
 			},
 		})
 
@@ -449,7 +445,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 				}
 
 				responseWrite(rw, indexHTML)
-				return
 			},
 		})
 	}
