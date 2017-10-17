@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "SHELL2HTTP" "" "May 2017" "" ""
+.TH "SHELL2HTTP" "" "October 2017" "" ""
 HTTP\-server for executing shell commands\. Designed for develop, prototype or remote control\. Settings through two command line arguments, path and shell command\. By default bind to :8080\.
 .
 .SH "Usage"
@@ -10,12 +10,12 @@ HTTP\-server for executing shell commands\. Designed for develop, prototype or r
 
 shell2http [options] /path "shell command" /path2 "shell command2" \.\.\.
 options:
-    \-host="host"    : host for http server, default \- all interfaces
-    \-port=NNNN      : port for http server, default \- 8080
+    \-host="host"    : host IP for http server (default bind to all interfaces)
+    \-port=NNNN      : port for http server (default 8080)
     \-form           : parse query into environment vars, handle uploaded files
     \-cgi            : run scripts in CGI\-mode:
                       \- set environment variables with HTTP\-request information
-                      \- write POST\-data to script STDIN (if not set \-form)
+                      \- write POST\-data to script STDIN (if is not set \-form)
                       \- parse headers from script (eg: "Location: URL\en\en")
     \-export\-vars=var: export environment vars ("VAR1,VAR2,\.\.\.")
                       by default export PATH, HOME, LANG, USER, TMPDIR
