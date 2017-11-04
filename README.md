@@ -176,6 +176,15 @@ shell2http -cgi /call1 'cat 1.json' /call2 'echo "Content-Type: application/json
 ```
 </details>
 
+<details><summary>Windows example</summary>
+
+Returns value of `var` for run in Windows `cmd` (`http://localhost:8080/test?var=value123`)
+
+```sh
+shell2http.exe -form /test "echo %v_var%"
+```
+</details>
+
 [More examples ...](https://github.com/msoap/shell2http/wiki)
 
 Run from Docker-container
