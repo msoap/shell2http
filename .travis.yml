@@ -58,7 +58,7 @@ after_success:
     fi
 
 before_deploy:
-  - curl -SL https://raw.githubusercontent.com/msoap/etc/master/golang-cross-build/golang-cross-build.sh > $GOPATH/bin/golang-cross-build.sh
+  - curl -sSL https://raw.githubusercontent.com/msoap/etc/master/golang-cross-build/golang-cross-build.sh > $GOPATH/bin/golang-cross-build.sh
   - chmod 700 $GOPATH/bin/golang-cross-build.sh
   - gem install --no-ri --no-rdoc fpm
   - golang-cross-build.sh $APP_NAME
