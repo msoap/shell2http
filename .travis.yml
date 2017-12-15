@@ -25,9 +25,6 @@ before_install:
   - go get github.com/mattn/goveralls
   - go get github.com/philwinder/gocoverage
   - go get github.com/kisielk/errcheck
-  - sudo apt-get update
-  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
-  - docker version
 
 install: go get -t ./...
 
@@ -54,7 +51,6 @@ after_success:
         docker push $DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG &&
         docker push quay.io/$DOCKER_USERNAME/$APP_NAME:$TRAVIS_TAG;
       fi;
-      rm -f $APP_NAME;
     fi
 
 before_deploy:
