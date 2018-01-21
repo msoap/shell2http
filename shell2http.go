@@ -627,6 +627,10 @@ func isMultipartFormData(headers http.Header) bool {
 func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 	varsNames := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
 
+	if runtime.GOOS == "windows" {
+		varsNames = append(varsNames, "USERNAME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "TEMP", "TMP", "PATHEXT", "COMSPEC", "OS")
+	}
+
 	if appConfig.exportVars != "" {
 		varsNames = append(varsNames, strings.Split(appConfig.exportVars, ",")...)
 	}
@@ -638,7 +642,7 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 				cmd.Env = append(cmd.Env, envRaw)
 			} else {
 				for _, envVarName := range varsNames {
-					if env[0] == envVarName {
+					if strings.ToUpper(env[0]) == envVarName {
 						cmd.Env = append(cmd.Env, envRaw)
 					}
 				}
