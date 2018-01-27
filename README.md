@@ -60,7 +60,7 @@ MacOS:
     # update:
     brew upgrade shell2http
 
-Or download binaries from: [releases](https://github.com/msoap/shell2http/releases) (OS X/Linux/Windows/RaspberryPi)
+Or download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (OS X/Linux/Windows/RaspberryPi)
 
 Or build from source:
 
