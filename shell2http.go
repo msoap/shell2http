@@ -99,7 +99,7 @@ type Config struct {
 	exportAllVars bool   // export all current environment vars
 	setCGI        bool   // set CGI variables
 	setForm       bool   // parse form from URL
-	noIndex       bool   // dont generate index page
+	noIndex       bool   // don't generate index page
 	addExit       bool   // add /exit command
 	oneThread     bool   // run each shell commands in one thread
 	showErrors    bool   // returns the standard output even if the command exits with a non-zero exit code
@@ -135,7 +135,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	flag.StringVar(&appConfig.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
 	flag.BoolVar(&appConfig.exportAllVars, "export-all-vars", false, "export all current environment vars")
 	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars, handle uploaded files")
-	flag.BoolVar(&appConfig.noIndex, "no-index", false, "dont generate index page")
+	flag.BoolVar(&appConfig.noIndex, "no-index", false, "don't generate index page")
 	flag.BoolVar(&appConfig.addExit, "add-exit", false, "add /exit command")
 	flag.StringVar(&appConfig.shell, "shell", appConfig.defaultShell, `custom shell or "" for execute without shell`)
 	flag.IntVar(&appConfig.cache, "cache", 0, "caching command out (in seconds)")
@@ -527,7 +527,7 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 		return parts[1], headersMap
 	}
 
-	// headers dont found, return all text
+	// headers don't found, return all text
 	return shellOut, map[string]string{}
 }
 

@@ -27,7 +27,7 @@ Usage
         -export-vars=var: export environment vars ("VAR1,VAR2,...")
                           by default export PATH, HOME, LANG, USER, TMPDIR
         -export-all-vars: export all current environment vars
-        -no-index       : dont generate index page
+        -no-index       : don't generate index page
         -add-exit       : add /exit command
         -log=filename   : log filename, default - STDOUT
         -shell="shell"  : shell for execute command, "" - without shell (default "sh")
