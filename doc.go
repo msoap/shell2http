@@ -47,6 +47,7 @@ In the "-form" mode, variables are available for shell scripts:
  - $filename_ID -- uploaded file name from browser
 
 The credentials for basic authentication may also be provided via the SH_BASIC_AUTH environment variable.
+You can specify the preferred HTTP-method (via "METHOD:" prefix for path): shell2http GET:/date date
 
 Examples:
 	shell2http /top "top -l 1 | head -10"

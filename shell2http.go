@@ -77,9 +77,10 @@ const INDEXHTML = `<!DOCTYPE html>
 
 // Command - one command type
 type Command struct {
-	path    string
-	cmd     string
-	handler http.HandlerFunc
+	path       string
+	cmd        string
+	httpMethod string
+	handler    http.HandlerFunc
 }
 
 // Config - config struct
