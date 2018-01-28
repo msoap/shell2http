@@ -256,7 +256,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 		printAccessLogLine(req)
 		setCommonHeaders(rw)
 
-		shellOut, err := execShellCommand(appConfig, path, shell, params, req, cacheTTL)
+		shellOut, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
 		if err != nil {
 			log.Println("exec error: ", err)
 		}
@@ -302,7 +302,7 @@ func getShellHandler(appConfig Config, path string, shell string, params []strin
 
 // ------------------------------------------------------------------
 // execShellCommand - execute shell command, returns bytes out and error
-func execShellCommand(appConfig Config, path string, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, error) {
+func execShellCommand(appConfig Config, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, error) {
 	if appConfig.cache > 0 {
 		if cacheData, err := cacheTTL.GetBytes(req.RequestURI); err != raphanuscommon.ErrKeyNotExists && err != nil {
 			log.Printf("get from cache failed: %s", err)
