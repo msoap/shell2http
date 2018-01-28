@@ -243,7 +243,7 @@ func printAccessLogLine(req *http.Request) {
 
 // ------------------------------------------------------------------
 // getShellHandler - get handler function for one shell command
-func getShellHandler(appConfig Config, path string, shell string, params []string, cacheTTL raphanus.DB) func(http.ResponseWriter, *http.Request) {
+func getShellHandler(appConfig Config, shell string, params []string, cacheTTL raphanus.DB) func(http.ResponseWriter, *http.Request) {
 	mutex := sync.Mutex{}
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
@@ -409,7 +409,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		existsRootPath = existsRootPath || path == "/"
 
 		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
-		cmdHandlers[i].handler = getShellHandler(appConfig, path, shell, params, cacheTTL)
+		cmdHandlers[i].handler = getShellHandler(appConfig, shell, params, cacheTTL)
 	}
 
 	// --------------
