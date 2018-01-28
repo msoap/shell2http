@@ -194,21 +194,31 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		}
 	}
 
-	// need >= 2 arguments and count of it must be even
-	args := flag.Args()
+	if cmdHandlers, err = parsePathAndCommands(flag.Args()); err != nil {
+		return nil, Config{}, fmt.Errorf("failed to parse arguments: %s", err)
+	}
+
+	return cmdHandlers, appConfig, nil
+}
+
+// ------------------------------------------------------------------
+// parsePathAndCommands - get all commands with pathes
+func parsePathAndCommands(args []string) ([]Command, error) {
+	var cmdHandlers []Command
+
 	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, Config{}, fmt.Errorf("requires a pair of path and shell command")
+		return cmdHandlers, fmt.Errorf("requires a pair of path and shell command")
 	}
 
 	for i := 0; i < len(args); i += 2 {
 		path, cmd := args[i], args[i+1]
 		if path[0] != '/' {
-			return nil, Config{}, fmt.Errorf("the path %q does not begin with the prefix /", path)
+			return cmdHandlers, fmt.Errorf("the path %q does not begin with the prefix /", path)
 		}
 		cmdHandlers = append(cmdHandlers, Command{path: path, cmd: cmd})
 	}
 
-	return cmdHandlers, appConfig, nil
+	return cmdHandlers, nil
 }
 
 // ------------------------------------------------------------------
