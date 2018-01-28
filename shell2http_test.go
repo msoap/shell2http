@@ -302,3 +302,68 @@ func Test_errChainAll(t *testing.T) {
 		t.Errorf("6. errChainAll() failed")
 	}
 }
+
+func Test_parsePathAndCommands(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		want    []Command
+		wantErr bool
+	}{
+		{
+			name:    "empty list",
+			args:    nil,
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "empty list 2",
+			args:    []string{},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "one arg",
+			args:    []string{"arg"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "two arg without path",
+			args:    []string{"arg", "arg2"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "three arg",
+			args:    []string{"/arg", "date", "aaa"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "two arg",
+			args:    []string{"/date", "date"},
+			want:    []Command{{path: "/date", cmd: "date"}},
+			wantErr: false,
+		},
+		{
+			name:    "four arg",
+			args:    []string{"/date", "date", "/", "echo index"},
+			want:    []Command{{path: "/date", cmd: "date"}, {path: "/", cmd: "echo index"}},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePathAndCommands(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePathAndCommands() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parsePathAndCommands() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
