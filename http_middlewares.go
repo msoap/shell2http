@@ -31,6 +31,6 @@ func mwBasicAuth(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 			return
 		}
 
-		handler(rw, req)
+		handler.ServeHTTP(rw, req)
 	}
 }
