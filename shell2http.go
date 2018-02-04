@@ -422,7 +422,8 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		existsRootPath = existsRootPath || path == "/"
 
 		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
-		cmdHandlers[i].handler = getShellHandler(appConfig, shell, params, cacheTTL)
+
+		cmdHandlers[i].handler = mwMethodOnly(row.httpMethod, getShellHandler(appConfig, shell, params, cacheTTL))
 	}
 
 	// --------------
@@ -463,6 +464,22 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 	}
 
 	return cmdHandlers, nil
+}
+
+// ------------------------------------------------------------------
+// mwMethodOnly - allow one HTTP method only
+func mwMethodOnly(method string, from http.HandlerFunc) http.HandlerFunc {
+	if method == "" {
+		return from
+	}
+
+	return func(rw http.ResponseWriter, req *http.Request) {
+		if req.Method == method {
+			from.ServeHTTP(rw, req)
+		} else {
+			http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		}
+	}
 }
 
 // ------------------------------------------------------------------
