@@ -423,7 +423,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
 
-		cmdHandlers[i].handler = mwMethodOnly(row.httpMethod, getShellHandler(appConfig, shell, params, cacheTTL))
+		cmdHandlers[i].handler = mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
 	}
 
 	// --------------
@@ -464,22 +464,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 	}
 
 	return cmdHandlers, nil
-}
-
-// ------------------------------------------------------------------
-// mwMethodOnly - allow one HTTP method only
-func mwMethodOnly(method string, from http.HandlerFunc) http.HandlerFunc {
-	if method == "" {
-		return from
-	}
-
-	return func(rw http.ResponseWriter, req *http.Request) {
-		if req.Method == method {
-			from.ServeHTTP(rw, req)
-		} else {
-			http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		}
-	}
 }
 
 // ------------------------------------------------------------------
@@ -687,23 +671,6 @@ func setCommonHeaders(rw http.ResponseWriter) {
 	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 }
 
-// ------------------------------------------------------------------
-// basicAuthWrapper - add HTTP Basic Authentication
-func basicAuthWrapper(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
-	return func(rw http.ResponseWriter, req *http.Request) {
-		reqUser, reqPass, ok := req.BasicAuth()
-		if !ok || reqUser != user || reqPass != pass {
-			setCommonHeaders(rw)
-			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and passoerd"`)
-			http.Error(rw, "name/password is required", http.StatusUnauthorized)
-			printAccessLogLine(req)
-			return
-		}
-
-		handler(rw, req)
-	}
-}
-
 // errChain - handle errors on few functions
 func errChain(chainFuncs ...func() error) error {
 	for _, fn := range chainFuncs {
@@ -746,7 +713,7 @@ func main() {
 	for _, handler := range cmdHandlers {
 		handlerFunc := handler.handler
 		if len(appConfig.authUser) > 0 {
-			handlerFunc = basicAuthWrapper(handler.handler, appConfig.authUser, appConfig.authPass)
+			handlerFunc = mwBasicAuth(handler.handler, appConfig.authUser, appConfig.authPass)
 		}
 
 		http.HandleFunc(handler.path, handlerFunc)
