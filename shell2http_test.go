@@ -177,10 +177,10 @@ func Test_main(t *testing.T) {
 		"-shell=",
 		"-log=/dev/null",
 		"-port=" + port,
-		"/echo", "echo 123",
-		"/form", "echo var=$v_var",
+		"GET:/echo", "echo 123",
+		"POST:/form", "echo var=$v_var",
 		"/error", "/ not exists cmd",
-		"/post", "cat",
+		"POST:/post", "cat",
 		"/redirect", `echo "Location: /` + "\n" + `"`,
 	}
 	go main()
@@ -234,6 +234,13 @@ func Test_main(t *testing.T) {
 	testHTTP(t, "POST", "http://localhost:"+port+"/post", "X-header: value\n\ntext",
 		func(res string) bool { return strings.HasPrefix(res, "text") },
 		"7. POST",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/form", "",
+		func(res string) bool {
+			return strings.HasPrefix(res, http.StatusText(http.StatusMethodNotAllowed))
+		},
+		"8. POST with GET",
 	)
 }
 
