@@ -26,7 +26,7 @@ import (
 )
 
 // VERSION - version
-const VERSION = "1.11"
+const VERSION = "1.13"
 
 // PORT - default port for http-server
 const PORT = 8080
@@ -77,9 +77,10 @@ const INDEXHTML = `<!DOCTYPE html>
 
 // Command - one command type
 type Command struct {
-	path    string
-	cmd     string
-	handler http.HandlerFunc
+	path       string
+	cmd        string
+	httpMethod string
+	handler    http.HandlerFunc
 }
 
 // Config - config struct
@@ -193,21 +194,33 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 		}
 	}
 
-	// need >= 2 arguments and count of it must be even
-	args := flag.Args()
-	if len(args) < 2 || len(args)%2 == 1 {
-		return nil, Config{}, fmt.Errorf("requires a pair of path and shell command")
-	}
-
-	for i := 0; i < len(args); i += 2 {
-		path, cmd := args[i], args[i+1]
-		if path[0] != '/' {
-			return nil, Config{}, fmt.Errorf("the path %q does not begin with the prefix /", path)
-		}
-		cmdHandlers = append(cmdHandlers, Command{path: path, cmd: cmd})
+	if cmdHandlers, err = parsePathAndCommands(flag.Args()); err != nil {
+		return nil, Config{}, fmt.Errorf("failed to parse arguments: %s", err)
 	}
 
 	return cmdHandlers, appConfig, nil
+}
+
+// ------------------------------------------------------------------
+// parsePathAndCommands - get all commands with pathes
+func parsePathAndCommands(args []string) ([]Command, error) {
+	var cmdHandlers []Command
+
+	if len(args) < 2 || len(args)%2 == 1 {
+		return cmdHandlers, fmt.Errorf("requires a pair of path and shell command")
+	}
+
+	pathRe := regexp.MustCompile(`^(?:([A-Z]+):)?(/\S*)$`)
+	for i := 0; i < len(args); i += 2 {
+		path, cmd := args[i], args[i+1]
+		pathParts := pathRe.FindStringSubmatch(path)
+		if len(pathParts) != 3 {
+			return cmdHandlers, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
+		}
+		cmdHandlers = append(cmdHandlers, Command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
+	}
+
+	return cmdHandlers, nil
 }
 
 // ------------------------------------------------------------------
@@ -409,7 +422,8 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		existsRootPath = existsRootPath || path == "/"
 
 		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
-		cmdHandlers[i].handler = getShellHandler(appConfig, shell, params, cacheTTL)
+
+		cmdHandlers[i].handler = mwMethodOnly(row.httpMethod, getShellHandler(appConfig, shell, params, cacheTTL))
 	}
 
 	// --------------
@@ -450,6 +464,22 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 	}
 
 	return cmdHandlers, nil
+}
+
+// ------------------------------------------------------------------
+// mwMethodOnly - allow one HTTP method only
+func mwMethodOnly(method string, from http.HandlerFunc) http.HandlerFunc {
+	if method == "" {
+		return from
+	}
+
+	return func(rw http.ResponseWriter, req *http.Request) {
+		if req.Method == method {
+			from.ServeHTTP(rw, req)
+		} else {
+			http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		}
+	}
 }
 
 // ------------------------------------------------------------------

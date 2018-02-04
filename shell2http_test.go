@@ -177,10 +177,10 @@ func Test_main(t *testing.T) {
 		"-shell=",
 		"-log=/dev/null",
 		"-port=" + port,
-		"/echo", "echo 123",
-		"/form", "echo var=$v_var",
+		"GET:/echo", "echo 123",
+		"POST:/form", "echo var=$v_var",
 		"/error", "/ not exists cmd",
-		"/post", "cat",
+		"POST:/post", "cat",
 		"/redirect", `echo "Location: /` + "\n" + `"`,
 	}
 	go main()
@@ -234,6 +234,13 @@ func Test_main(t *testing.T) {
 	testHTTP(t, "POST", "http://localhost:"+port+"/post", "X-header: value\n\ntext",
 		func(res string) bool { return strings.HasPrefix(res, "text") },
 		"7. POST",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/form", "",
+		func(res string) bool {
+			return strings.HasPrefix(res, http.StatusText(http.StatusMethodNotAllowed))
+		},
+		"8. POST with GET",
 	)
 }
 
@@ -300,5 +307,94 @@ func Test_errChainAll(t *testing.T) {
 	err = errChainAll(func() error { return fmt.Errorf("error") }, func() error { var1 = true; return nil })
 	if err == nil || !var1 {
 		t.Errorf("6. errChainAll() failed")
+	}
+}
+
+func Test_parsePathAndCommands(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		want    []Command
+		wantErr bool
+	}{
+		{
+			name:    "empty list",
+			args:    nil,
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "empty list 2",
+			args:    []string{},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "one arg",
+			args:    []string{"arg"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "two arg without path",
+			args:    []string{"arg", "arg2"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "three arg",
+			args:    []string{"/arg", "date", "aaa"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "two arg",
+			args:    []string{"/date", "date"},
+			want:    []Command{{path: "/date", cmd: "date"}},
+			wantErr: false,
+		},
+		{
+			name:    "four arg",
+			args:    []string{"/date", "date", "/", "echo index"},
+			want:    []Command{{path: "/date", cmd: "date"}, {path: "/", cmd: "echo index"}},
+			wantErr: false,
+		},
+		{
+			name:    "with http method",
+			args:    []string{"POST:/date", "date", "GET:/", "echo index"},
+			want:    []Command{{path: "/date", cmd: "date", httpMethod: "POST"}, {path: "/", cmd: "echo index", httpMethod: "GET"}},
+			wantErr: false,
+		},
+		{
+			name:    "invalid method",
+			args:    []string{"get:/date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid method2",
+			args:    []string{"GET_A:/date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid path",
+			args:    []string{"GET:/date 2"},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePathAndCommands(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePathAndCommands() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parsePathAndCommands() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
