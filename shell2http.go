@@ -211,13 +211,21 @@ func parsePathAndCommands(args []string) ([]Command, error) {
 	}
 
 	pathRe := regexp.MustCompile(`^(?:([A-Z]+):)?(/\S*)$`)
+	uniqPaths := map[string]bool{}
+
 	for i := 0; i < len(args); i += 2 {
 		path, cmd := args[i], args[i+1]
+		if uniqPaths[path] {
+			return nil, fmt.Errorf("a duplicate path was detected: %q", path)
+		}
+
 		pathParts := pathRe.FindStringSubmatch(path)
 		if len(pathParts) != 3 {
-			return cmdHandlers, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
+			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
 		}
 		cmdHandlers = append(cmdHandlers, Command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
+
+		uniqPaths[path] = true
 	}
 
 	return cmdHandlers, nil
