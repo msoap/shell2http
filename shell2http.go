@@ -713,7 +713,7 @@ func main() {
 	for _, handler := range cmdHandlers {
 		handlerFunc := handler.handler
 		if len(appConfig.authUser) > 0 {
-			handlerFunc = mwBasicAuth(handler.handler, appConfig.authUser, appConfig.authPass)
+			handlerFunc = mwBasicAuth(handlerFunc, appConfig.authUser, appConfig.authPass)
 		}
 
 		http.HandleFunc(handler.path, handlerFunc)
