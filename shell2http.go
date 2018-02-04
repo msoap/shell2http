@@ -417,10 +417,14 @@ func getExitCode(execErr error) int {
 // ------------------------------------------------------------------
 // setupHandlers - setup http handlers
 func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB) ([]Command, error) {
+	resultHandlers := []Command{}
 	indexLiHTML := ""
 	existsRootPath := false
 
-	for i, row := range cmdHandlers {
+	// map[path][http-method]handler
+	groupedCmd := map[string]map[string]http.HandlerFunc{}
+
+	for _, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
 		shell, params, err := getShellAndParams(cmd, appConfig)
 		if err != nil {
@@ -429,14 +433,33 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 		existsRootPath = existsRootPath || path == "/"
 
-		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+		methodDesc := ""
+		if row.httpMethod != "" {
+			methodDesc = row.httpMethod + ": "
+		}
+		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s<span></li>`, path, methodDesc, path, html.EscapeString(cmd))
 
-		cmdHandlers[i].handler = mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
+		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
+		if _, ok := groupedCmd[path]; !ok {
+			groupedCmd[path] = map[string]http.HandlerFunc{}
+		}
+		groupedCmd[path][row.httpMethod] = handler
+	}
+
+	for path, cmds := range groupedCmd {
+		handler, err := mwMultiMethod(cmds)
+		if err != nil {
+			return nil, err
+		}
+		resultHandlers = append(resultHandlers, Command{
+			path:    path,
+			handler: handler,
+		})
 	}
 
 	// --------------
 	if appConfig.addExit {
-		cmdHandlers = append(cmdHandlers, Command{
+		resultHandlers = append(resultHandlers, Command{
 			path: "/exit",
 			cmd:  "/exit",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
@@ -453,7 +476,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
 		indexHTML := fmt.Sprintf(INDEXHTML, indexLiHTML)
-		cmdHandlers = append(cmdHandlers, Command{
+		resultHandlers = append(resultHandlers, Command{
 			path: "/",
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
@@ -471,7 +494,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		})
 	}
 
-	return cmdHandlers, nil
+	return resultHandlers, nil
 }
 
 // ------------------------------------------------------------------

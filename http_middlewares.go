@@ -1,6 +1,40 @@
 package main
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
+
+// ------------------------------------------------------------------
+// mwMultiMethod - produce handler for several http methods
+func mwMultiMethod(in map[string]http.HandlerFunc) (http.HandlerFunc, error) {
+	switch len(in) {
+	case 0:
+		return nil, fmt.Errorf("requires at least one handler")
+	case 1:
+		for method, handler := range in {
+			return mwMethodOnly(handler, method), nil
+		}
+	}
+
+	for method := range in {
+		if method == "" {
+			return nil, fmt.Errorf("mixing predetermined HTTP method with empty is not allowed")
+		}
+	}
+
+	return func(rw http.ResponseWriter, req *http.Request) {
+		for method, handler := range in {
+			if req.Method == method {
+				handler.ServeHTTP(rw, req)
+				return
+			}
+		}
+
+		// not matched http method
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}, nil
+}
 
 // ------------------------------------------------------------------
 // mwMethodOnly - allow one HTTP method only
