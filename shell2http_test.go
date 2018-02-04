@@ -383,6 +383,12 @@ func Test_parsePathAndCommands(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name:    "not uniq path",
+			args:    []string{"POST:/date", "date", "POST:/date", "echo index"},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

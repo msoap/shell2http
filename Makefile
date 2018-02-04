@@ -5,10 +5,10 @@ APP_MAINTAINER := $$(git show HEAD | awk '$$1 == "Author:" {print $$2 " " $$3 " 
 GIT_TAG := $$(git describe --tags --abbrev=0)
 
 run:
-	go run shell2http.go -add-exit -cgi /date date /env 'printenv | sort'
+	go run shell2http.go http_middlewares.go -add-exit -cgi GET:/date date GET:/env 'printenv | sort'
 
 build:
-	go build shell2http.go
+	go build .
 
 update-from-github:
 	go get -u github.com/msoap/$(APP_NAME)

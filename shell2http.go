@@ -211,13 +211,21 @@ func parsePathAndCommands(args []string) ([]Command, error) {
 	}
 
 	pathRe := regexp.MustCompile(`^(?:([A-Z]+):)?(/\S*)$`)
+	uniqPaths := map[string]bool{}
+
 	for i := 0; i < len(args); i += 2 {
 		path, cmd := args[i], args[i+1]
+		if uniqPaths[path] {
+			return nil, fmt.Errorf("a duplicate path was detected: %q", path)
+		}
+
 		pathParts := pathRe.FindStringSubmatch(path)
 		if len(pathParts) != 3 {
-			return cmdHandlers, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
+			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
 		}
 		cmdHandlers = append(cmdHandlers, Command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
+
+		uniqPaths[path] = true
 	}
 
 	return cmdHandlers, nil
@@ -409,10 +417,14 @@ func getExitCode(execErr error) int {
 // ------------------------------------------------------------------
 // setupHandlers - setup http handlers
 func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB) ([]Command, error) {
+	resultHandlers := []Command{}
 	indexLiHTML := ""
 	existsRootPath := false
 
-	for i, row := range cmdHandlers {
+	// map[path][http-method]handler
+	groupedCmd := map[string]map[string]http.HandlerFunc{}
+
+	for _, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
 		shell, params, err := getShellAndParams(cmd, appConfig)
 		if err != nil {
@@ -421,14 +433,33 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 		existsRootPath = existsRootPath || path == "/"
 
-		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a> <span style="color: #888">- %s<span></li>`, path, path, html.EscapeString(cmd))
+		methodDesc := ""
+		if row.httpMethod != "" {
+			methodDesc = row.httpMethod + ": "
+		}
+		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s<span></li>`, path, methodDesc, path, html.EscapeString(cmd))
 
-		cmdHandlers[i].handler = mwMethodOnly(row.httpMethod, getShellHandler(appConfig, shell, params, cacheTTL))
+		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
+		if _, ok := groupedCmd[path]; !ok {
+			groupedCmd[path] = map[string]http.HandlerFunc{}
+		}
+		groupedCmd[path][row.httpMethod] = handler
+	}
+
+	for path, cmds := range groupedCmd {
+		handler, err := mwMultiMethod(cmds)
+		if err != nil {
+			return nil, err
+		}
+		resultHandlers = append(resultHandlers, Command{
+			path:    path,
+			handler: handler,
+		})
 	}
 
 	// --------------
 	if appConfig.addExit {
-		cmdHandlers = append(cmdHandlers, Command{
+		resultHandlers = append(resultHandlers, Command{
 			path: "/exit",
 			cmd:  "/exit",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
@@ -445,7 +476,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
 		indexHTML := fmt.Sprintf(INDEXHTML, indexLiHTML)
-		cmdHandlers = append(cmdHandlers, Command{
+		resultHandlers = append(resultHandlers, Command{
 			path: "/",
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
@@ -463,23 +494,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		})
 	}
 
-	return cmdHandlers, nil
-}
-
-// ------------------------------------------------------------------
-// mwMethodOnly - allow one HTTP method only
-func mwMethodOnly(method string, from http.HandlerFunc) http.HandlerFunc {
-	if method == "" {
-		return from
-	}
-
-	return func(rw http.ResponseWriter, req *http.Request) {
-		if req.Method == method {
-			from.ServeHTTP(rw, req)
-		} else {
-			http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		}
-	}
+	return resultHandlers, nil
 }
 
 // ------------------------------------------------------------------
@@ -687,23 +702,6 @@ func setCommonHeaders(rw http.ResponseWriter) {
 	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 }
 
-// ------------------------------------------------------------------
-// basicAuthWrapper - add HTTP Basic Authentication
-func basicAuthWrapper(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
-	return func(rw http.ResponseWriter, req *http.Request) {
-		reqUser, reqPass, ok := req.BasicAuth()
-		if !ok || reqUser != user || reqPass != pass {
-			setCommonHeaders(rw)
-			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and passoerd"`)
-			http.Error(rw, "name/password is required", http.StatusUnauthorized)
-			printAccessLogLine(req)
-			return
-		}
-
-		handler(rw, req)
-	}
-}
-
 // errChain - handle errors on few functions
 func errChain(chainFuncs ...func() error) error {
 	for _, fn := range chainFuncs {
@@ -746,7 +744,7 @@ func main() {
 	for _, handler := range cmdHandlers {
 		handlerFunc := handler.handler
 		if len(appConfig.authUser) > 0 {
-			handlerFunc = basicAuthWrapper(handler.handler, appConfig.authUser, appConfig.authPass)
+			handlerFunc = mwBasicAuth(handlerFunc, appConfig.authUser, appConfig.authPass)
 		}
 
 		http.HandleFunc(handler.path, handlerFunc)
