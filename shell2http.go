@@ -210,12 +210,14 @@ func parsePathAndCommands(args []string) ([]Command, error) {
 		return cmdHandlers, fmt.Errorf("requires a pair of path and shell command")
 	}
 
+	pathRe := regexp.MustCompile(`^(?:([A-Z]+):)?(/\S*)$`)
 	for i := 0; i < len(args); i += 2 {
 		path, cmd := args[i], args[i+1]
-		if path[0] != '/' {
-			return cmdHandlers, fmt.Errorf("the path %q does not begin with the prefix /", path)
+		pathParts := pathRe.FindStringSubmatch(path)
+		if len(pathParts) != 3 {
+			return cmdHandlers, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
 		}
-		cmdHandlers = append(cmdHandlers, Command{path: path, cmd: cmd})
+		cmdHandlers = append(cmdHandlers, Command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
 	}
 
 	return cmdHandlers, nil
