@@ -352,6 +352,30 @@ func Test_parsePathAndCommands(t *testing.T) {
 			want:    []Command{{path: "/date", cmd: "date"}, {path: "/", cmd: "echo index"}},
 			wantErr: false,
 		},
+		{
+			name:    "with http method",
+			args:    []string{"POST:/date", "date", "GET:/", "echo index"},
+			want:    []Command{{path: "/date", cmd: "date", httpMethod: "POST"}, {path: "/", cmd: "echo index", httpMethod: "GET"}},
+			wantErr: false,
+		},
+		{
+			name:    "invalid method",
+			args:    []string{"get:/date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid method2",
+			args:    []string{"GET_A:/date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid path",
+			args:    []string{"GET:/date 2"},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
