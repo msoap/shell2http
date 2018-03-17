@@ -1,0 +1,24 @@
+name: shell2http
+version: '1.13'
+summary: Executing shell commands via HTTP server
+description: |
+  HTTP-server for executing shell commands. Designed for develop, prototype or remote control.
+  Settings through two command line arguments, path and shell command.
+  By default bind to :8080.
+  https://github.com/msoap/shell2http
+grade: stable
+confinement: strict
+
+parts:
+  shell2http:
+    after: [go]
+    source: .
+    plugin: go
+    go-importpath: github.com/msoap/shell2http
+  go:
+    source-tag: go1.10
+
+apps:
+  shell2http:
+    command: shell2http
+    plugs: [network-bind, network, home]
