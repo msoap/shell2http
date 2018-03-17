@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "SHELL2HTTP" "" "January 2018" "" ""
+.TH "SHELL2HTTP" "" "March 2018" "" ""
 HTTP\-server for executing shell commands\. Designed for develop, prototype or remote control\. Settings through two command line arguments, path and shell command\. By default bind to :8080\.
 .
 .SH "Usage"
@@ -71,22 +71,27 @@ brew upgrade shell2http
 .IP "" 0
 .
 .P
-Or download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases/latest\fR (OS X/Linux/Windows/RaspberryPi)
-.
-.P
-Or build from source:
+Using snap (Ubuntu or any Linux distribution with snap):
 .
 .IP "" 4
 .
 .nf
 
-go get \-u github\.com/msoap/shell2http
-# set link to your PATH if needed:
-ln \-s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
+# install stable version:
+sudo snap install shell2http
+
+# install the latest version:
+sudo snap install \-\-edge shell2http
+
+# update
+sudo snap refresh shell2http
 .
 .fi
 .
 .IP "" 0
+.
+.P
+Download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases/latest\fR (OS X/Linux/Windows/RaspberryPi)
 .
 .P
 Docker users:
@@ -96,6 +101,21 @@ Docker users:
 .nf
 
 docker pull msoap/shell2http
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Build from source:
+.
+.IP "" 4
+.
+.nf
+
+go get \-u github\.com/msoap/shell2http
+# set link to your PATH if needed:
+ln \-s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
 .
 .fi
 .

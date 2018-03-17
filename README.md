@@ -6,6 +6,7 @@ shell2http
 [![Coverage Status](https://coveralls.io/repos/github/msoap/shell2http/badge.svg?branch=master)](https://coveralls.io/github/msoap/shell2http?branch=master)
 [![Docker Pulls](https://img.shields.io/docker/pulls/msoap/shell2http.svg?maxAge=3600)](https://hub.docker.com/r/msoap/shell2http/)
 [![Homebrew formula exists](https://img.shields.io/badge/homebrew-🍺-d7af72.svg)](https://github.com/msoap/shell2http#install)
+[![Snap Status](https://build.snapcraft.io/badge/msoap/shell2http.svg)](https://build.snapcraft.io/user/msoap/shell2http)
 [![Report Card](https://goreportcard.com/badge/github.com/msoap/shell2http)](https://goreportcard.com/report/github.com/msoap/shell2http)
 
 HTTP-server for executing shell commands. Designed for develop, prototype or remote control.
@@ -61,17 +62,28 @@ MacOS:
     # update:
     brew upgrade shell2http
 
-Or download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (OS X/Linux/Windows/RaspberryPi)
+Using snap (Ubuntu or any Linux distribution with snap):
 
-Or build from source:
+    # install stable version:
+    sudo snap install shell2http
+    
+    # install the latest version:
+    sudo snap install --edge shell2http
+    
+    # update
+    sudo snap refresh shell2http
 
-    go get -u github.com/msoap/shell2http
-    # set link to your PATH if needed:
-    ln -s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
+Download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (OS X/Linux/Windows/RaspberryPi)
 
 Docker users:
 
     docker pull msoap/shell2http
+
+Build from source:
+
+    go get -u github.com/msoap/shell2http
+    # set link to your PATH if needed:
+    ln -s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
 
 Examples
 --------
