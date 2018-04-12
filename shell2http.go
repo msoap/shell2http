@@ -423,6 +423,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 	// map[path][http-method]handler
 	groupedCmd := map[string]map[string]http.HandlerFunc{}
+	cmdsForLog := map[string][]string{}
 
 	for _, row := range cmdHandlers {
 		path, cmd := row.path, row.cmd
@@ -438,6 +439,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			methodDesc = row.httpMethod + ": "
 		}
 		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s<span></li>`, path, methodDesc, path, html.EscapeString(cmd))
+		cmdsForLog[path] = append(cmdsForLog[path], cmd)
 
 		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
 		if _, ok := groupedCmd[path]; !ok {
@@ -454,6 +456,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		resultHandlers = append(resultHandlers, Command{
 			path:    path,
 			handler: handler,
+			cmd:     strings.Join(cmdsForLog[path], "; "),
 		})
 	}
 
