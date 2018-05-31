@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "SHELL2HTTP" "" "April 2018" "" ""
+.TH "SHELL2HTTP" "" "May 2018" "" ""
 HTTP\-server for executing shell commands\. Designed for develop, prototype or remote control\. Settings through two command line arguments, path and shell command\. By default bind to :8080\.
 .
 .SH "Usage"
@@ -89,6 +89,9 @@ sudo snap refresh shell2http
 .fi
 .
 .IP "" 0
+.
+.P
+Notice: the spap\-package has its own sandbox with the \fB/bin\fR, \fB/usr/bin\fR directories which are not equal to system\-wide \fBPATH\fR directories\.
 .
 .P
 Download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases/latest\fR (OS X/Linux/Windows/RaspberryPi)

@@ -73,6 +73,8 @@ Using snap (Ubuntu or any Linux distribution with snap):
     # update
     sudo snap refresh shell2http
 
+Notice: the spap-package has its own sandbox with the `/bin`, `/usr/bin` directories which are not equal to system-wide `PATH` directories.
+
 Download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (OS X/Linux/Windows/RaspberryPi)
 
 Docker users:
