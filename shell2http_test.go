@@ -113,7 +113,7 @@ func Test_getShellAndParams_windows(t *testing.T) {
 	}
 }
 
-func httpRequest(method string, url string, postData string) ([]byte, error) {
+func httpRequest(method, url, postData string) ([]byte, error) {
 	var postDataReader io.Reader
 	if method == "POST" && len(postData) > 0 {
 		postDataReader = strings.NewReader(postData)
