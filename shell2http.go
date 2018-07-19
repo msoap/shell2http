@@ -114,7 +114,7 @@ type Config struct {
 }
 
 // readableURL - get readable URL for logging
-func (cnf Config) readableURL(addr net.Addr) string {
+func (cnf Config) readableURL(addr fmt.Stringer) string {
 	prefix := "http"
 	if len(cnf.cert) > 0 && len(cnf.key) > 0 {
 		prefix = "https"
@@ -122,7 +122,7 @@ func (cnf Config) readableURL(addr net.Addr) string {
 
 	urlParts := strings.Split(addr.String(), ":")
 	if len(urlParts) == 0 {
-		log.Printf("listen address is invalid, port not found", addr.String())
+		log.Printf("listen address is invalid, port not found: %s", addr.String())
 		return fmt.Sprintf("%s//%s/", prefix, addr.String())
 	}
 
