@@ -19,7 +19,7 @@ Usage
     shell2http [options] /path "shell command" /path2 "shell command2" ...
     options:
         -host="host"    : host IP for http server (default bind to all interfaces)
-        -port=NNNN      : port for http server (default 8080)
+        -port=NNNN      : port for http server, 0 - to receive a random port (default 8080)
         -form           : parse query into environment vars, handle uploaded files
         -cgi            : run scripts in CGI-mode:
                           - set environment variables with HTTP-request information

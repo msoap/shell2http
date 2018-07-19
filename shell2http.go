@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,23 +26,28 @@ import (
 	raphanuscommon "github.com/msoap/raphanus/common"
 )
 
-// VERSION - version
-const VERSION = "1.13"
+const (
+	// VERSION - version
+	VERSION = "1.13"
 
-// PORT - default port for http-server
-const PORT = 8080
+	// PORT - default port for http-server
+	PORT = 8080
 
-// shBasicAuthVar - name of env var for basic auth credentials
-const shBasicAuthVar = "SH_BASIC_AUTH"
+	// shBasicAuthVar - name of env var for basic auth credentials
+	shBasicAuthVar = "SH_BASIC_AUTH"
 
-// defaultShellPOSIX - shell executable by default in POSIX systems
-const defaultShellPOSIX = "sh"
+	// defaultShellPOSIX - shell executable by default in POSIX systems
+	defaultShellPOSIX = "sh"
 
-// defaultShellWindows - shell executable by default in Windows
-const defaultShellWindows = "cmd"
+	// defaultShellWindows - shell executable by default in Windows
+	defaultShellWindows = "cmd"
 
-// defaultShellPlan9 - shell executable by default in Plan9
-const defaultShellPlan9 = "rc"
+	// defaultShellPlan9 - shell executable by default in Plan9
+	defaultShellPlan9 = "rc"
+
+	maxHTTPCode            = 1000
+	maxMemoryForUploadFile = 65536
+)
 
 // ------------------------------------------------------------------
 
@@ -107,10 +113,31 @@ type Config struct {
 	includeStderr bool   // also returns output written to stderr (default is stdout only)
 }
 
-const (
-	maxHTTPCode            = 1000
-	maxMemoryForUploadFile = 65536
-)
+// readableURL - get readable URL for logging
+func (cnf Config) readableURL(addr net.Addr) string {
+	prefix := "http"
+	if len(cnf.cert) > 0 && len(cnf.key) > 0 {
+		prefix = "https"
+	}
+
+	urlParts := strings.Split(addr.String(), ":")
+	if len(urlParts) == 0 {
+		log.Printf("listen address is invalid, port not found", addr.String())
+		return fmt.Sprintf("%s//%s/", prefix, addr.String())
+	}
+
+	port := strconv.Itoa(cnf.port)
+	if port == "0" {
+		port = urlParts[len(urlParts)-1]
+	}
+
+	host := cnf.host
+	if host == "" {
+		host = "localhost"
+	}
+
+	return fmt.Sprintf("%s://%s:%s/", prefix, host, port)
+}
 
 // ------------------------------------------------------------------
 // getConfig - parse arguments
@@ -754,13 +781,16 @@ func main() {
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)
 	}
 
-	address := fmt.Sprintf("%s:%d", appConfig.host, appConfig.port)
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", appConfig.host, appConfig.port))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("listen %s\n", appConfig.readableURL(listener.Addr()))
 
 	if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
-		log.Printf("listen https://%s/\n", address)
-		log.Fatal(http.ListenAndServeTLS(address, appConfig.cert, appConfig.key, nil))
+		log.Fatal(http.ServeTLS(listener, nil, appConfig.cert, appConfig.key))
 	} else {
-		log.Printf("listen http://%s/\n", address)
-		log.Fatal(http.ListenAndServe(address, nil))
+		log.Fatal(http.Serve(listener, nil))
 	}
 }
