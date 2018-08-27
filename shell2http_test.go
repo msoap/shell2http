@@ -69,6 +69,11 @@ func Test_parseCGIHeaders(t *testing.T) {
 			out:     "Header: value\nText:     \n\ntext",
 			headers: map[string]string{},
 		},
+		{
+			in:      "Location: url\r\nX-Name:  x-value\r\n\r\nOn Windows",
+			out:     "On Windows",
+			headers: map[string]string{"Location": "url", "X-Name": "x-value"},
+		},
 	}
 
 	for i, item := range data {
