@@ -187,7 +187,7 @@ shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STD
 
 ```sh
 curl "http://some-service/v1/call1" > 1.json
-shell2http -cgi /call1 'cat 1.json' /call2 'echo "Content-Type: application/json;\n"; echo "{\"error\": \"ok\"}"'
+shell2http -cgi /call1 'cat 1.json' /call2 'echo "Content-Type: application/json\n"; echo "{\"error\": \"ok\"}"'
 ```
 </details>
 
@@ -198,6 +198,22 @@ Returns value of `var` for run in Windows `cmd` (`http://localhost:8080/test?var
 ```sh
 shell2http.exe -form /test "echo %v_var%"
 ```
+</details>
+
+<details><summary>With HTTP headers</summary>
+
+Send custom HTTP headers:
+
+```sh
+shell2http -cgi / 'echo "Content-Type: application/javascript\n"; echo "{\"error\": \"ok\"}"'
+```
+
+On Windows:
+
+```sh
+shell2http.exe -cgi / "echo Content-Type: application/javascript& echo.& echo body"
+```
+
 </details>
 
 [More examples ...](https://github.com/msoap/shell2http/wiki)

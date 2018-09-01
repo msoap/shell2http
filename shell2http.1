@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "SHELL2HTTP" "" "July 2018" "" ""
+.TH "SHELL2HTTP" "" "September 2018" "" ""
 HTTP\-server for executing shell commands\. Designed for develop, prototype or remote control\. Settings through two command line arguments, path and shell command\. By default bind to :8080\.
 .
 .SH "Usage"
@@ -274,7 +274,7 @@ shell2http /img \'cat "$(ls "/Library/Desktop Pictures/"*\.jpg | ruby \-e "puts 
 .nf
 
 curl "http://some\-service/v1/call1" > 1\.json
-shell2http \-cgi /call1 \'cat 1\.json\' /call2 \'echo "Content\-Type: application/json;\en"; echo "{\e"error\e": \e"ok\e"}"\'
+shell2http \-cgi /call1 \'cat 1\.json\' /call2 \'echo "Content\-Type: application/json\en"; echo "{\e"error\e": \e"ok\e"}"\'
 .
 .fi
 .
@@ -288,6 +288,34 @@ Returns value of \fBvar\fR for run in Windows \fBcmd\fR (\fBhttp://localhost:808
 .nf
 
 shell2http\.exe \-form /test "echo %v_var%"
+.
+.fi
+.
+.IP "" 0
+.
+.P
+.
+.SS "With HTTP headers"
+Send custom HTTP headers:
+.
+.IP "" 4
+.
+.nf
+
+shell2http \-cgi / \'echo "Content\-Type: application/javascript\en"; echo "{\e"error\e": \e"ok\e"}"\'
+.
+.fi
+.
+.IP "" 0
+.
+.P
+On Windows:
+.
+.IP "" 4
+.
+.nf
+
+shell2http\.exe \-cgi / "echo Content\-Type: application/javascript& echo\.& echo body"
 .
 .fi
 .
