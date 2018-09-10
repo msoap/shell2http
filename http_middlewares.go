@@ -59,7 +59,7 @@ func mwBasicAuth(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 		reqUser, reqPass, ok := req.BasicAuth()
 		if !ok || reqUser != user || reqPass != pass {
 			setCommonHeaders(rw)
-			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and passoerd"`)
+			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and password"`)
 			http.Error(rw, "name/password is required", http.StatusUnauthorized)
 			printAccessLogLine(req)
 			return
