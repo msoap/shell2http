@@ -7,7 +7,7 @@ shell2http
 [![Report Card](https://goreportcard.com/badge/github.com/msoap/shell2http)](https://goreportcard.com/report/github.com/msoap/shell2http)
 [![Docker Pulls](https://img.shields.io/docker/pulls/msoap/shell2http.svg?maxAge=3600)](https://hub.docker.com/r/msoap/shell2http/)
 [![Homebrew formula exists](https://img.shields.io/badge/homebrew-🍺-d7af72.svg)](https://github.com/msoap/shell2http#install)
-[![Snap Status](https://build.snapcraft.io/badge/msoap/shell2http.svg)](https://build.snapcraft.io/user/msoap/shell2http)
+[![Snap Status](https://build.snapcraft.io/badge/msoap/shell2http.svg)](https://snapcraft.io/shell2http)
 
 HTTP-server for executing shell commands. Designed for develop, prototype or remote control.
 Settings through two command line arguments, path and shell command.
