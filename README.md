@@ -9,7 +9,7 @@ shell2http
 [![Homebrew formula exists](https://img.shields.io/badge/homebrew-🍺-d7af72.svg)](https://github.com/msoap/shell2http#install)
 [![Snap Status](https://build.snapcraft.io/badge/msoap/shell2http.svg)](https://snapcraft.io/shell2http)
 
-HTTP-server for executing shell commands. Designed for develop, prototype or remote control.
+HTTP-server to execute shell commands. Designed for development, prototyping or remote control.
 Settings through two command line arguments, path and shell command.
 By default bind to :8080.
 
