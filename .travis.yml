@@ -31,7 +31,7 @@ script:
   - go vet ./...
   - errcheck ./...
   - diff <(gofmt -d .) <(echo -n "")
-  - if [[ "$IS_LATEST_GO" == "true" ]]; then
+  - if [[ "$IS_LATEST_GO" == "true" ]] && [[ "$TRAVIS_BRANCH" == "master" ]] && [[ "$TRAVIS_EVENT_TYPE" == "push" ]]; then
       go test -covermode=count -coverprofile=profile.cov ./... && goveralls -coverprofile=profile.cov -service=travis-ci || true;
     fi
 
