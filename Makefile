@@ -5,7 +5,7 @@ APP_MAINTAINER := $$(git show HEAD | awk '$$1 == "Author:" {print $$2 " " $$3 " 
 GIT_TAG := $$(git describe --tags --abbrev=0)
 
 run:
-	go run shell2http.go http_middlewares.go -add-exit -cgi GET:/date date GET:/env 'printenv | sort'
+	go run . -add-exit -cgi GET:/date date GET:/env 'printenv | sort'
 
 build:
 	go build .
