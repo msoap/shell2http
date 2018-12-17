@@ -432,8 +432,8 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 // ------------------------------------------------------------------
 // getExitCode - get exit code. May be works on POSIX-system only, need test on Windows
 func getExitCode(execErr error) int {
-	if exiterr, ok := execErr.(*exec.ExitError); ok {
-		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+	if exitErr, ok := execErr.(*exec.ExitError); ok {
+		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 			return status.ExitStatus()
 		}
 	}
