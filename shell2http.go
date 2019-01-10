@@ -17,7 +17,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -282,15 +281,9 @@ func getShellAndParams(cmd string, appConfig Config) (shell string, params []str
 // ------------------------------------------------------------------
 // getShellHandler - get handler function for one shell command
 func getShellHandler(appConfig Config, shell string, params []string, cacheTTL raphanus.DB) func(http.ResponseWriter, *http.Request) {
-	mutex := sync.Mutex{}
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
 	return func(rw http.ResponseWriter, req *http.Request) {
-		if appConfig.oneThread {
-			mutex.Lock()
-			defer mutex.Unlock()
-		}
-
 		shellOut, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
 		if err != nil {
 			log.Println("exec error: ", err)
@@ -752,6 +745,9 @@ func main() {
 		handlerFunc := handler.handler
 		if len(appConfig.authUser) > 0 {
 			handlerFunc = mwBasicAuth(handlerFunc, appConfig.authUser, appConfig.authPass)
+		}
+		if appConfig.oneThread {
+			handlerFunc = mwOneThread(handlerFunc)
 		}
 		handlerFunc = mwLogging(mwCommonHeaders(handlerFunc))
 

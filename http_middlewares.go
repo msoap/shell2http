@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -89,5 +90,17 @@ func mwCommonHeaders(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
 		handler.ServeHTTP(rw, req)
+	}
+}
+
+// ------------------------------------------------------------------
+// mwOneThread - run handler in one thread
+func mwOneThread(handler http.HandlerFunc) http.HandlerFunc {
+	mutex := sync.Mutex{}
+
+	return func(rw http.ResponseWriter, req *http.Request) {
+		mutex.Lock()
+		handler.ServeHTTP(rw, req)
+		mutex.Unlock()
 	}
 }
