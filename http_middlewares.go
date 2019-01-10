@@ -60,7 +60,6 @@ func mwBasicAuth(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		reqUser, reqPass, ok := req.BasicAuth()
 		if !ok || reqUser != user || reqPass != pass {
-			setCommonHeaders(rw)
 			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and password"`)
 			http.Error(rw, "name/password is required", http.StatusUnauthorized)
 			return
@@ -81,5 +80,14 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 		start := time.Now()
 		handler.ServeHTTP(rw, req)
 		log.Printf("%s %s %s %s \"%s\" %s", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent(), time.Since(start).Round(time.Millisecond))
+	}
+}
+
+// ------------------------------------------------------------------
+// mwCommonHeaders - set common headers
+func mwCommonHeaders(handler http.HandlerFunc) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
+		handler.ServeHTTP(rw, req)
 	}
 }

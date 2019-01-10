@@ -291,8 +291,6 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 			defer mutex.Unlock()
 		}
 
-		setCommonHeaders(rw)
-
 		shellOut, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
 		if err != nil {
 			log.Println("exec error: ", err)
@@ -483,7 +481,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			path: "/exit",
 			cmd:  "/exit",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
-				setCommonHeaders(rw)
 				responseWrite(rw, "Bye...")
 				go os.Exit(0)
 			},
@@ -499,8 +496,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			path: "/",
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
-				setCommonHeaders(rw)
-
 				if req.URL.Path != "/" {
 					log.Printf("%s - 404", req.URL.Path)
 					http.NotFound(rw, req)
@@ -714,12 +709,6 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 	}
 }
 
-// ------------------------------------------------------------------
-// setCommonHeaders - set headers for all handlers
-func setCommonHeaders(rw http.ResponseWriter) {
-	rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
-}
-
 // errChain - handle errors on few functions
 func errChain(chainFuncs ...func() error) error {
 	for _, fn := range chainFuncs {
@@ -764,7 +753,7 @@ func main() {
 		if len(appConfig.authUser) > 0 {
 			handlerFunc = mwBasicAuth(handlerFunc, appConfig.authUser, appConfig.authPass)
 		}
-		handlerFunc = mwLogging(handlerFunc)
+		handlerFunc = mwLogging(mwCommonHeaders(handlerFunc))
 
 		http.HandleFunc(handler.path, handlerFunc)
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)
