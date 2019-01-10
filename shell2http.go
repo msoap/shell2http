@@ -280,16 +280,6 @@ func getShellAndParams(cmd string, appConfig Config) (shell string, params []str
 }
 
 // ------------------------------------------------------------------
-// printAccessLogLine - out one line of access log
-func printAccessLogLine(req *http.Request) {
-	remoteAddr := req.RemoteAddr
-	if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
-		remoteAddr = realIP[0] + ", " + remoteAddr
-	}
-	log.Printf("%s %s %s %s \"%s\"", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent())
-}
-
-// ------------------------------------------------------------------
 // getShellHandler - get handler function for one shell command
 func getShellHandler(appConfig Config, shell string, params []string, cacheTTL raphanus.DB) func(http.ResponseWriter, *http.Request) {
 	mutex := sync.Mutex{}
@@ -301,7 +291,6 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 			defer mutex.Unlock()
 		}
 
-		printAccessLogLine(req)
 		setCommonHeaders(rw)
 
 		shellOut, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
@@ -494,7 +483,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			path: "/exit",
 			cmd:  "/exit",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
-				printAccessLogLine(req)
 				setCommonHeaders(rw)
 				responseWrite(rw, "Bye...")
 				go os.Exit(0)
@@ -511,7 +499,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 			path: "/",
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
-				printAccessLogLine(req)
 				setCommonHeaders(rw)
 
 				if req.URL.Path != "/" {
@@ -777,6 +764,7 @@ func main() {
 		if len(appConfig.authUser) > 0 {
 			handlerFunc = mwBasicAuth(handlerFunc, appConfig.authUser, appConfig.authPass)
 		}
+		handlerFunc = mwLogging(handlerFunc)
 
 		http.HandleFunc(handler.path, handlerFunc)
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)

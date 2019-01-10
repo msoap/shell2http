@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 )
 
 // ------------------------------------------------------------------
@@ -61,10 +63,23 @@ func mwBasicAuth(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 			setCommonHeaders(rw)
 			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and password"`)
 			http.Error(rw, "name/password is required", http.StatusUnauthorized)
-			printAccessLogLine(req)
 			return
 		}
 
 		handler.ServeHTTP(rw, req)
+	}
+}
+
+// ------------------------------------------------------------------
+// mwLogging - add logging for handler
+func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		remoteAddr := req.RemoteAddr
+		if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
+			remoteAddr = realIP[0] + ", " + remoteAddr
+		}
+		start := time.Now()
+		handler.ServeHTTP(rw, req)
+		log.Printf("%s %s %s %s \"%s\" %s", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent(), time.Since(start).Round(time.Millisecond))
 	}
 }
