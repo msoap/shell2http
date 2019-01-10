@@ -431,6 +431,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 
 // ------------------------------------------------------------------
 // getExitCode - get exit code. May be works on POSIX-system only, need test on Windows
+// TODO: use https://tip.golang.org/pkg/os/#ProcessState.ExitCode after released go 1.13
 func getExitCode(execErr error) int {
 	if exitErr, ok := execErr.(*exec.ExitError); ok {
 		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
