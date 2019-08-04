@@ -368,10 +368,10 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	if appConfig.setCGI {
 		setCGIEnv(osExecCommand, req, appConfig)
 
-		// get POST data to stdin of script (if not parse form vars above)
-		if req.Method == "POST" && !appConfig.setForm {
+		// get request body data data to stdin of script (if not parse form vars above)
+		if (req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") && !appConfig.setForm {
 			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
-				log.Println("write POST data to shell failed:", pipeErr)
+				log.Println("write request body data to shell failed:", pipeErr)
 			} else {
 				waitPipeWrite = true
 				go func() {
@@ -394,7 +394,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 
 	if waitPipeWrite {
 		if pipeErr := <-pipeErrCh; pipeErr != nil {
-			log.Println("write POST data to shell failed:", pipeErr)
+			log.Println("write request body data to shell failed:", pipeErr)
 		}
 	}
 

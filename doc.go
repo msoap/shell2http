@@ -21,7 +21,7 @@ Usage:
 		-form           : parse query into environment vars, handle uploaded files
 		-cgi            : run scripts in CGI-mode:
 		                  - set environment variables with HTTP-request information
-		                  - write POST-data to script STDIN (if not set -form)
+		                  - write POST|PUT|PATCH-data to script STDIN (if not set -form)
 		                  - parse headers from script (eg: "Location: URL\n\n")
 		-export-vars=var: export environment vars ("VAR1,VAR2,...")
 		-export-all-vars: export all current environment vars
