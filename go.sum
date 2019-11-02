@@ -11,6 +11,8 @@ github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaO
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-shellwords v1.0.3 h1:K/VxK7SZ+cvuPgFSLKi5QPI9Vr/ipOf4C1gN+ntueUk=
 github.com/mattn/go-shellwords v1.0.3/go.mod h1:3xCvwCdWdlDJUrvuMn7Wuy9eWs4pE8vqg+NOMyg4B2o=
+github.com/mattn/go-shellwords v1.0.6 h1:9Jok5pILi5S1MnDirGVTufYGtksUs/V2BWUP3ZkeUUI=
+github.com/mattn/go-shellwords v1.0.6/go.mod h1:3xCvwCdWdlDJUrvuMn7Wuy9eWs4pE8vqg+NOMyg4B2o=
 github.com/mediocregopher/radix.v2 v0.0.0-20180603022615-94360be26253 h1:Vr5Q1i03Z36XuXdX1OQYUuJjnX7sYDLT3skT2VBgXrQ=
 github.com/mediocregopher/radix.v2 v0.0.0-20180603022615-94360be26253/go.mod h1:fLRUbhbSd5Px2yKUaGYYPltlyxi1guJz1vCmo1RQL50=
 github.com/msoap/raphanus v0.11.0 h1:7zax99MzfJm+NZr6J7G5IJZTQAjUnUkGGISPuLa8UHk=
