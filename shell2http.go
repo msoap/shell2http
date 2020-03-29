@@ -17,7 +17,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/mattn/go-shellwords"
@@ -284,12 +283,12 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
 	return func(rw http.ResponseWriter, req *http.Request) {
-		shellOut, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
+		shellOut, exitCode, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
 		if err != nil {
 			log.Println("exec error: ", err)
 		}
 
-		rw.Header().Set("X-Shell2http-Exit-Code", fmt.Sprintf("%d", getExitCode(err)))
+		rw.Header().Set("X-Shell2http-Exit-Code", strconv.Itoa(exitCode))
 
 		if err != nil && !appConfig.showErrors {
 			responseWrite(rw, "exec error: "+err.Error())
@@ -330,13 +329,13 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 
 // ------------------------------------------------------------------
 // execShellCommand - execute shell command, returns bytes out and error
-func execShellCommand(appConfig Config, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, error) {
+func execShellCommand(appConfig Config, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, int, error) {
 	if appConfig.cache > 0 {
 		if cacheData, err := cacheTTL.GetBytes(req.RequestURI); err != raphanuscommon.ErrKeyNotExists && err != nil {
 			log.Printf("get from cache failed: %s", err)
 		} else if err == nil {
 			// cache hit
-			return cacheData, nil
+			return cacheData, 0, nil // TODO: save exit code in cache
 		}
 	}
 
@@ -406,20 +405,9 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		}
 	}
 
-	return shellOut, err
-}
+	exitCode := osExecCommand.ProcessState.ExitCode()
 
-// ------------------------------------------------------------------
-// getExitCode - get exit code. May be works on POSIX-system only, need test on Windows
-// TODO: use https://tip.golang.org/pkg/os/#ProcessState.ExitCode after released go 1.13
-func getExitCode(execErr error) int {
-	if exitErr, ok := execErr.(*exec.ExitError); ok {
-		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-			return status.ExitStatus()
-		}
-	}
-
-	return 0
+	return shellOut, exitCode, err
 }
 
 // ------------------------------------------------------------------

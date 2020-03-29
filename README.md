@@ -81,7 +81,7 @@ Docker users:
 
     docker pull msoap/shell2http
 
-Build from source:
+Build from source (minimum Go version is 1.12):
 
     go get -u github.com/msoap/shell2http
     # set link to your PATH if needed:
