@@ -13,8 +13,6 @@ base: core18
 parts:
   shell2http:
     plugin: go
-    go-channel: latest/stable
-    go-importpath: github.com/msoap/shell2http
     source: .
     source-type: git
     build-packages:
