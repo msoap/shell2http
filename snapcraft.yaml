@@ -16,7 +16,7 @@ parts:
     plugin: go
     go-importpath: github.com/msoap/shell2http
   go:
-    source-tag: go1.10
+    source-tag: go1.14
 
 apps:
   shell2http:
