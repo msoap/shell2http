@@ -78,9 +78,16 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 		if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
 			remoteAddr = realIP[0] + ", " + remoteAddr
 		}
+		rwLogger := &responseWriterLogger{srcRW: rw}
 		start := time.Now()
-		handler.ServeHTTP(rw, req)
-		log.Printf("%s %s %s %s \"%s\" %s", req.Host, remoteAddr, req.Method, req.RequestURI, req.UserAgent(), time.Since(start).Round(time.Millisecond))
+		handler.ServeHTTP(rwLogger, req)
+		log.Printf(`%s %s "%s %s" %d %d "%s" %s`,
+			req.Host, remoteAddr,
+			req.Method, req.RequestURI,
+			rwLogger.StatusCode(), rwLogger.Size(),
+			req.UserAgent(),
+			time.Since(start).Round(time.Millisecond),
+		)
 	}
 }
 
@@ -103,4 +110,37 @@ func mwOneThread(handler http.HandlerFunc) http.HandlerFunc {
 		handler.ServeHTTP(rw, req)
 		mutex.Unlock()
 	}
+}
+
+// ------------------------------------------------------------------
+// responseWriterLogger - wrapper around http.ResponseWriter
+type responseWriterLogger struct {
+	srcRW      http.ResponseWriter
+	statusCode int
+	size       int
+}
+
+func (rwl *responseWriterLogger) Header() http.Header {
+	return rwl.srcRW.Header()
+}
+
+func (rwl *responseWriterLogger) Write(data []byte) (int, error) {
+	rwl.size += len(data)
+	return rwl.srcRW.Write(data)
+}
+
+func (rwl *responseWriterLogger) WriteHeader(statusCode int) {
+	rwl.statusCode = statusCode
+	rwl.srcRW.WriteHeader(statusCode)
+}
+
+func (rwl *responseWriterLogger) StatusCode() int {
+	if rwl.statusCode == 0 {
+		return http.StatusOK
+	}
+	return rwl.statusCode
+}
+
+func (rwl *responseWriterLogger) Size() int {
+	return rwl.size
 }
