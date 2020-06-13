@@ -18,28 +18,29 @@ Usage
 
     shell2http [options] /path "shell command" /path2 "shell command2" ...
     options:
-        -host="host"    : host IP for http server (default bind to all interfaces)
-        -port=NNNN      : port for http server, 0 - to receive a random port (default 8080)
-        -form           : parse query into environment vars, handle uploaded files
-        -cgi            : run scripts in CGI-mode:
-                          - set environment variables with HTTP-request information
-                          - write POST|PUT|PATCH-data to script STDIN (if is not set -form)
-                          - parse headers from script (eg: "Location: URL\n\n")
-        -export-vars=var: export environment vars ("VAR1,VAR2,...")
-                          by default export PATH, HOME, LANG, USER, TMPDIR
-        -export-all-vars: export all current environment vars
-        -no-index       : don't generate index page
-        -add-exit       : add /exit command
-        -log=filename   : log filename, default - STDOUT
-        -shell="shell"  : shell for execute command, "" - without shell (default "sh")
-        -cache=N        : caching command out for N seconds
-        -one-thread     : run each shell command in one thread
-        -show-errors    : show the standard output even if the command exits with a non-zero exit code
-        -include-stderr : include stderr to output (default is stdout only)
-        -cert=cert.pem  : SSL certificate path (if specified -cert/-key options - run https server)
-        -key=key.pem    : SSL private key path
-        -basic-auth=""  : setup HTTP Basic Authentication ("user_name:password")
-        -timeout=N	    : set timeout for execute shell command (in seconds)
+        -host="host"      : host IP for http server (default bind to all interfaces)
+        -port=NNNN        : port for http server, 0 - to receive a random port (default 8080)
+        -form             : parse query into environment vars, handle uploaded files
+        -cgi              : run scripts in CGI-mode:
+                            - set environment variables with HTTP-request information
+                            - write POST|PUT|PATCH-data to script STDIN (if is not set -form)
+                            - parse headers from script (eg: "Location: URL\n\n")
+        -export-vars=var  : export environment vars ("VAR1,VAR2,...")
+                            by default export PATH, HOME, LANG, USER, TMPDIR
+        -export-all-vars  : export all current environment vars
+        -no-index         : don't generate index page
+        -add-exit         : add /exit command
+        -log=filename     : log filename, default - STDOUT
+        -shell="shell"    : shell for execute command, "" - without shell (default "sh")
+        -cache=N          : caching command out for N seconds
+        -one-thread       : run each shell command in one thread
+        -show-errors      : show the standard output even if the command exits with a non-zero exit code
+        -include-stderr   : include stderr to output (default is stdout only)
+        -cert=cert.pem    : SSL certificate path (if specified -cert/-key options - run https server)
+        -key=key.pem      : SSL private key path
+        -basic-auth=""    : setup HTTP Basic Authentication ("user_name:password")
+        -timeout=N        : set timeout for execute shell command (in seconds)
+        -no-log-timestamp : log output without timestamps
         -version
         -help
 
