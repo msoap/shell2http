@@ -141,8 +141,9 @@ func (cnf Config) readableURL(addr fmt.Stringer) string {
 // getConfig - parse arguments
 func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	var (
-		logFilename string
-		basicAuth   string
+		logFilename    string
+		basicAuth      string
+		noLogTimestamp bool
 	)
 
 	switch runtime.GOOS {
@@ -155,6 +156,7 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	}
 
 	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
+	flag.BoolVar(&noLogTimestamp, "no-log-timestamp", false, "log output without timestamps")
 	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
 	flag.StringVar(&appConfig.host, "host", "", "host for http server")
 	flag.BoolVar(&appConfig.setCGI, "cgi", false, "run scripts in CGI-mode")
@@ -194,6 +196,10 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 			return nil, Config{}, fmt.Errorf("error opening log file: %v", err)
 		}
 		log.SetOutput(fhLog)
+	}
+
+	if noLogTimestamp {
+		log.SetFlags(0)
 	}
 
 	if len(appConfig.cert) > 0 && len(appConfig.key) == 0 ||
