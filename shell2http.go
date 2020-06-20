@@ -467,7 +467,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		resultHandlers = append(resultHandlers, Command{
 			path: "/exit",
 			cmd:  "/exit",
-			handler: func(rw http.ResponseWriter, req *http.Request) {
+			handler: func(rw http.ResponseWriter, _ *http.Request) {
 				responseWrite(rw, "Bye...")
 				go os.Exit(0)
 			},
