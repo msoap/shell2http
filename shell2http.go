@@ -134,7 +134,7 @@ func (cnf Config) readableURL(addr fmt.Stringer) string {
 		host = "localhost"
 	}
 
-	return fmt.Sprintf("%s://%s:%s/", prefix, host, port)
+	return fmt.Sprintf("%s://%s/", prefix, net.JoinHostPort(host, port))
 }
 
 // ------------------------------------------------------------------
@@ -532,7 +532,7 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 		{"REQUEST_URI", req.RequestURI},
 		{"SCRIPT_NAME", req.URL.Path},
 		{"SERVER_NAME", appConfig.host},
-		{"SERVER_PORT", fmt.Sprintf("%d", appConfig.port)},
+		{"SERVER_PORT", strconv.Itoa(appConfig.port)},
 		{"SERVER_PROTOCOL", req.Proto},
 		{"SERVER_SOFTWARE", "shell2http"},
 	}
@@ -749,7 +749,7 @@ func main() {
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)
 	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", appConfig.host, appConfig.port))
+	listener, err := net.Listen("tcp", net.JoinHostPort(appConfig.host, strconv.Itoa(appConfig.port)))
 	if err != nil {
 		log.Fatal(err)
 	}
