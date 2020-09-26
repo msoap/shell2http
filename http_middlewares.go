@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// ------------------------------------------------------------------
 // mwMultiMethod - produce handler for several http methods
 func mwMultiMethod(in map[string]http.HandlerFunc) (http.HandlerFunc, error) {
 	switch len(in) {
@@ -39,7 +38,6 @@ func mwMultiMethod(in map[string]http.HandlerFunc) (http.HandlerFunc, error) {
 	}, nil
 }
 
-// ------------------------------------------------------------------
 // mwMethodOnly - allow one HTTP method only
 func mwMethodOnly(handler http.HandlerFunc, method string) http.HandlerFunc {
 	if method == "" {
@@ -55,7 +53,6 @@ func mwMethodOnly(handler http.HandlerFunc, method string) http.HandlerFunc {
 	}
 }
 
-// ------------------------------------------------------------------
 // mwBasicAuth - add HTTP Basic Authentication
 func mwBasicAuth(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
@@ -70,7 +67,6 @@ func mwBasicAuth(handler http.HandlerFunc, user, pass string) http.HandlerFunc {
 	}
 }
 
-// ------------------------------------------------------------------
 // mwLogging - add logging for handler
 func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
@@ -91,7 +87,6 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// ------------------------------------------------------------------
 // mwCommonHeaders - set common headers
 func mwCommonHeaders(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
@@ -100,7 +95,6 @@ func mwCommonHeaders(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// ------------------------------------------------------------------
 // mwOneThread - run handler in one thread
 func mwOneThread(handler http.HandlerFunc) http.HandlerFunc {
 	mutex := sync.Mutex{}
@@ -112,7 +106,6 @@ func mwOneThread(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// ------------------------------------------------------------------
 // responseWriterLogger - wrapper around http.ResponseWriter
 type responseWriterLogger struct {
 	srcRW      http.ResponseWriter

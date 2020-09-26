@@ -47,8 +47,6 @@ const (
 	maxMemoryForUploadFile = 65536
 )
 
-// ------------------------------------------------------------------
-
 // INDEXHTML - Template for index page
 const INDEXHTML = `<!DOCTYPE html>
 <html>
@@ -76,8 +74,6 @@ const INDEXHTML = `<!DOCTYPE html>
 </body>
 </html>
 `
-
-// ------------------------------------------------------------------
 
 // Command - one command type
 type Command struct {
@@ -137,7 +133,6 @@ func (cnf Config) readableURL(addr fmt.Stringer) string {
 	return fmt.Sprintf("%s://%s/", prefix, net.JoinHostPort(host, port))
 }
 
-// ------------------------------------------------------------------
 // getConfig - parse arguments
 func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	var (
@@ -232,7 +227,6 @@ func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
 	return cmdHandlers, appConfig, nil
 }
 
-// ------------------------------------------------------------------
 // parsePathAndCommands - get all commands with pathes
 func parsePathAndCommands(args []string) ([]Command, error) {
 	var cmdHandlers []Command
@@ -262,7 +256,6 @@ func parsePathAndCommands(args []string) ([]Command, error) {
 	return cmdHandlers, nil
 }
 
-// ------------------------------------------------------------------
 // getShellAndParams - get default shell and command
 func getShellAndParams(cmd string, appConfig Config) (shell string, params []string, err error) {
 	shell, params = appConfig.defaultShell, []string{appConfig.defaultShOpt, cmd} // sh -c "cmd"
@@ -283,7 +276,6 @@ func getShellAndParams(cmd string, appConfig Config) (shell string, params []str
 	return shell, params, nil
 }
 
-// ------------------------------------------------------------------
 // getShellHandler - get handler function for one shell command
 func getShellHandler(appConfig Config, shell string, params []string, cacheTTL raphanus.DB) func(http.ResponseWriter, *http.Request) {
 	reStatusCode := regexp.MustCompile(`^\d+`)
@@ -333,7 +325,6 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 	}
 }
 
-// ------------------------------------------------------------------
 // execShellCommand - execute shell command, returns bytes out and error
 func execShellCommand(appConfig Config, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, int, error) {
 	if appConfig.cache > 0 {
@@ -416,7 +407,6 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	return shellOut, exitCode, err
 }
 
-// ------------------------------------------------------------------
 // setupHandlers - setup http handlers
 func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB) ([]Command, error) {
 	resultHandlers := []Command{}
@@ -497,7 +487,6 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 	return resultHandlers, nil
 }
 
-// ------------------------------------------------------------------
 // responseWrite - write text to response
 func responseWrite(rw io.Writer, text string) {
 	if _, err := io.WriteString(rw, text); err != nil {
@@ -505,7 +494,6 @@ func responseWrite(rw io.Writer, text string) {
 	}
 }
 
-// ------------------------------------------------------------------
 // setCGIEnv - set some CGI variables
 func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// set HTTP_* variables
@@ -542,7 +530,6 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	}
 }
 
-// ------------------------------------------------------------------
 /* parse headers from script output:
 
 Header-name1: value1\n
@@ -576,7 +563,6 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 	return shellOut, map[string]string{}
 }
 
-// ------------------------------------------------------------------
 // getForm - parse form into environment vars, also handle uploaded files
 func getForm(cmd *exec.Cmd, req *http.Request) (func(), error) {
 	tempDir := ""
@@ -657,7 +643,6 @@ func getForm(cmd *exec.Cmd, req *http.Request) (func(), error) {
 	return finalizer, nil
 }
 
-// ------------------------------------------------------------------
 // isMultipartFormData - check header for multipart/form-data
 func isMultipartFormData(headers http.Header) bool {
 	if contentType, ok := headers["Content-Type"]; ok && len(contentType) == 1 && strings.HasPrefix(contentType[0], "multipart/form-data; ") {
@@ -667,7 +652,6 @@ func isMultipartFormData(headers http.Header) bool {
 	return false
 }
 
-// ------------------------------------------------------------------
 // proxySystemEnv - proxy some system vars
 func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 	varsNames := []string{"PATH", "HOME", "LANG", "USER", "TMPDIR"}
@@ -719,7 +703,6 @@ func errChainAll(chainFuncs ...func() error) error {
 	return resErr
 }
 
-// ------------------------------------------------------------------
 func main() {
 	cmdHandlers, appConfig, err := getConfig()
 	if err != nil {
