@@ -38,7 +38,7 @@ Usage
         -include-stderr   : include stderr to output (default is stdout only)
         -cert=cert.pem    : SSL certificate path (if specified -cert/-key options - run https server)
         -key=key.pem      : SSL private key path
-        -basic-auth=""    : setup HTTP Basic Authentication ("user_name:password")
+        -basic-auth=""    : setup HTTP Basic Authentication ("user_name:password"), can be used several times
         -timeout=N        : set timeout for execute shell command (in seconds)
         -no-log-timestamp : log output without timestamps
         -version
@@ -50,6 +50,7 @@ In the `-form` mode, variables are available for shell scripts:
   * $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
   * $filename_ID -- uploaded file name from browser
 
+To setup multiple auth users, you can specify the `-basic-auth` option multiple times.
 The credentials for basic authentication may also be provided via the `SH_BASIC_AUTH` environment variable.
 You can specify the preferred HTTP-method (via `METHOD:` prefix for path): `shell2http GET:/date date`
 
