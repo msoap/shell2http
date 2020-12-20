@@ -77,7 +77,12 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 		rwLogger := &responseWriterLogger{srcRW: rw}
 		start := time.Now()
 		handler.ServeHTTP(rwLogger, req)
-		log.Printf(`%s %s "%s %s" %d %d "%s" %s`,
+		reqUser, _, ok := req.BasicAuth()
+		if ok {
+			reqUser += " "
+		}
+		log.Printf(`%s%s %s "%s %s" %d %d "%s" %s`,
+			reqUser,
 			req.Host, remoteAddr,
 			req.Method, req.RequestURI,
 			rwLogger.StatusCode(), rwLogger.Size(),
