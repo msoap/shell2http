@@ -83,150 +83,6 @@ type Command struct {
 	handler    http.HandlerFunc
 }
 
-// Config - config struct
-type Config struct {
-	port          int    // server port
-	cache         int    // caching command out (in seconds)
-	timeout       int    // timeout for shell command (in seconds)
-	host          string // server host
-	exportVars    string // list of environment vars for export to script
-	shell         string // custom shell
-	defaultShell  string // shell by default
-	defaultShOpt  string // shell option for one-liner (-c or /C)
-	cert          string // SSL certificate
-	key           string // SSL private key path
-	authUser      string // basic authentication user name
-	authPass      string // basic authentication password
-	exportAllVars bool   // export all current environment vars
-	setCGI        bool   // set CGI variables
-	setForm       bool   // parse form from URL
-	noIndex       bool   // don't generate index page
-	addExit       bool   // add /exit command
-	oneThread     bool   // run each shell commands in one thread
-	showErrors    bool   // returns the standard output even if the command exits with a non-zero exit code
-	includeStderr bool   // also returns output written to stderr (default is stdout only)
-}
-
-// readableURL - get readable URL for logging
-func (cnf Config) readableURL(addr fmt.Stringer) string {
-	prefix := "http"
-	if len(cnf.cert) > 0 && len(cnf.key) > 0 {
-		prefix = "https"
-	}
-
-	urlParts := strings.Split(addr.String(), ":")
-	if len(urlParts) == 0 {
-		log.Printf("listen address is invalid, port not found: %s", addr.String())
-		return fmt.Sprintf("%s//%s/", prefix, addr.String())
-	}
-
-	port := strconv.Itoa(cnf.port)
-	if port == "0" {
-		port = urlParts[len(urlParts)-1]
-	}
-
-	host := cnf.host
-	if host == "" {
-		host = "localhost"
-	}
-
-	return fmt.Sprintf("%s://%s/", prefix, net.JoinHostPort(host, port))
-}
-
-// getConfig - parse arguments
-func getConfig() (cmdHandlers []Command, appConfig Config, err error) {
-	var (
-		logFilename    string
-		basicAuth      string
-		noLogTimestamp bool
-	)
-
-	switch runtime.GOOS {
-	case "plan9":
-		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellPlan9, "-c"
-	case "windows":
-		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellWindows, "/C"
-	default:
-		appConfig.defaultShell, appConfig.defaultShOpt = defaultShellPOSIX, "-c"
-	}
-
-	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
-	flag.BoolVar(&noLogTimestamp, "no-log-timestamp", false, "log output without timestamps")
-	flag.IntVar(&appConfig.port, "port", PORT, "port for http server")
-	flag.StringVar(&appConfig.host, "host", "", "host for http server")
-	flag.BoolVar(&appConfig.setCGI, "cgi", false, "run scripts in CGI-mode")
-	flag.StringVar(&appConfig.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
-	flag.BoolVar(&appConfig.exportAllVars, "export-all-vars", false, "export all current environment vars")
-	flag.BoolVar(&appConfig.setForm, "form", false, "parse query into environment vars, handle uploaded files")
-	flag.BoolVar(&appConfig.noIndex, "no-index", false, "don't generate index page")
-	flag.BoolVar(&appConfig.addExit, "add-exit", false, "add /exit command")
-	flag.StringVar(&appConfig.shell, "shell", appConfig.defaultShell, `custom shell or "" for execute without shell`)
-	flag.IntVar(&appConfig.cache, "cache", 0, "caching command out (in seconds)")
-	flag.BoolVar(&appConfig.oneThread, "one-thread", false, "run each shell command in one thread")
-	flag.BoolVar(&appConfig.showErrors, "show-errors", false, "show the standard output even if the command exits with a non-zero exit code")
-	flag.BoolVar(&appConfig.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
-	flag.StringVar(&appConfig.cert, "cert", "", "SSL certificate path (if specified -cert/-key options - run https server)")
-	flag.StringVar(&appConfig.key, "key", "", "SSL private key path")
-	flag.StringVar(&basicAuth, "basic-auth", "", "setup HTTP Basic Authentication (\"user_name:password\")")
-	flag.IntVar(&appConfig.timeout, "timeout", 0, "set timeout for execute shell command (in seconds)")
-
-	flag.Usage = func() {
-		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
-		flag.PrintDefaults()
-		os.Exit(0)
-	}
-	version := flag.Bool("version", false, "get version")
-
-	flag.Parse()
-
-	if *version {
-		fmt.Println(VERSION)
-		os.Exit(0)
-	}
-
-	// setup log file
-	if len(logFilename) > 0 {
-		fhLog, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-		if err != nil {
-			return nil, Config{}, fmt.Errorf("error opening log file: %v", err)
-		}
-		log.SetOutput(fhLog)
-	}
-
-	if noLogTimestamp {
-		log.SetFlags(0)
-	}
-
-	if len(appConfig.cert) > 0 && len(appConfig.key) == 0 ||
-		len(appConfig.cert) == 0 && len(appConfig.key) > 0 {
-		return nil, Config{}, fmt.Errorf("requires both -cert and -key options")
-	}
-
-	if basicAuth == "" && len(os.Getenv(shBasicAuthVar)) > 0 {
-		basicAuth = os.Getenv(shBasicAuthVar)
-	}
-
-	if len(basicAuth) > 0 {
-		basicAuthParts := strings.SplitN(basicAuth, ":", 2)
-		if len(basicAuthParts) != 2 {
-			return nil, Config{}, fmt.Errorf("HTTP basic authentication must be in format: name:password, got: %s", basicAuth)
-		}
-		appConfig.authUser, appConfig.authPass = basicAuthParts[0], basicAuthParts[1]
-	}
-
-	if appConfig.shell != "" && appConfig.shell != appConfig.defaultShell {
-		if _, err := exec.LookPath(appConfig.shell); err != nil {
-			return nil, Config{}, fmt.Errorf("an error has occurred while searching for shell executable %q: %s", appConfig.shell, err)
-		}
-	}
-
-	if cmdHandlers, err = parsePathAndCommands(flag.Args()); err != nil {
-		return nil, Config{}, fmt.Errorf("failed to parse arguments: %s", err)
-	}
-
-	return cmdHandlers, appConfig, nil
-}
-
 // parsePathAndCommands - get all commands with pathes
 func parsePathAndCommands(args []string) ([]Command, error) {
 	var cmdHandlers []Command
@@ -704,9 +560,14 @@ func errChainAll(chainFuncs ...func() error) error {
 }
 
 func main() {
-	cmdHandlers, appConfig, err := getConfig()
+	appConfig, err := getConfig()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	cmdHandlers, err := parsePathAndCommands(flag.Args())
+	if err != nil {
+		log.Fatalf("failed to parse arguments: %s", err)
 	}
 
 	var cacheTTL raphanus.DB
@@ -714,14 +575,14 @@ func main() {
 		cacheTTL = raphanus.New()
 	}
 
-	cmdHandlers, err = setupHandlers(cmdHandlers, appConfig, cacheTTL)
+	cmdHandlers, err = setupHandlers(cmdHandlers, *appConfig, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, handler := range cmdHandlers {
 		handlerFunc := handler.handler
-		if len(appConfig.authUser) > 0 {
-			handlerFunc = mwBasicAuth(handlerFunc, appConfig.authUser, appConfig.authPass)
+		if len(appConfig.auth.users) > 0 {
+			handlerFunc = mwBasicAuth(handlerFunc, appConfig.auth)
 		}
 		if appConfig.oneThread {
 			handlerFunc = mwOneThread(handlerFunc)

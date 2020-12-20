@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "SHELL2HTTP" "" "June 2020" "" ""
+.TH "SHELL2HTTP" "" "December 2020" "" ""
 HTTP\-server to execute shell commands\. Designed for development, prototyping or remote control\. Settings through two command line arguments, path and shell command\. By default bind to :8080\.
 .
 .SH "Usage"
@@ -30,7 +30,7 @@ options:
     \-include\-stderr   : include stderr to output (default is stdout only)
     \-cert=cert\.pem    : SSL certificate path (if specified \-cert/\-key options \- run https server)
     \-key=key\.pem      : SSL private key path
-    \-basic\-auth=""    : setup HTTP Basic Authentication ("user_name:password")
+    \-basic\-auth=""    : setup HTTP Basic Authentication ("user_name:password"), can be used several times
     \-timeout=N        : set timeout for execute shell command (in seconds)
     \-no\-log\-timestamp : log output without timestamps
     \-version
@@ -53,7 +53,7 @@ $filename_ID \-\- uploaded file name from browser
 .IP "" 0
 .
 .P
-The credentials for basic authentication may also be provided via the \fBSH_BASIC_AUTH\fR environment variable\. You can specify the preferred HTTP\-method (via \fBMETHOD:\fR prefix for path): \fBshell2http GET:/date date\fR
+To setup multiple auth users, you can specify the \fB\-basic\-auth\fR option multiple times\. The credentials for basic authentication may also be provided via the \fBSH_BASIC_AUTH\fR environment variable\. You can specify the preferred HTTP\-method (via \fBMETHOD:\fR prefix for path): \fBshell2http GET:/date date\fR
 .
 .SH "Install"
 MacOS:
