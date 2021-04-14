@@ -8,7 +8,7 @@ description: |
   https://github.com/msoap/shell2http
 grade: stable
 confinement: strict
-base: core18
+base: core20
 
 parts:
   shell2http:
