@@ -8,17 +8,15 @@ description: |
   https://github.com/msoap/shell2http
 grade: stable
 confinement: strict
-base: core20
-
+base: core18
 parts:
   shell2http:
     plugin: go
+    go-importpath: github.com/msoap/shell2http
     source: .
     source-type: git
-    build-packages:
-      - gcc
 
 apps:
   shell2http:
-    command: shell2http
+    command: bin/shell2http
     plugs: [network-bind, network, home]
