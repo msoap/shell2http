@@ -85,10 +85,10 @@ func getConfig() (*Config, error) {
 		cfg.defaultShell, cfg.defaultShOpt = defaultShellPOSIX, "-c"
 	}
 
-	flag.StringVar(&logFilename, "log", "", "log filename, default - STDOUT")
+	flag.StringVar(&logFilename, "log", "", "log `filename`, default - STDOUT")
 	flag.BoolVar(&noLogTimestamp, "no-log-timestamp", false, "log output without timestamps")
-	flag.IntVar(&cfg.port, "port", PORT, "port for http server")
-	flag.StringVar(&cfg.host, "host", "", "host for http server")
+	flag.IntVar(&cfg.port, "port", PORT, "`port` for http server")
+	flag.StringVar(&cfg.host, "host", "", "`host` for http server")
 	flag.BoolVar(&cfg.setCGI, "cgi", false, "run scripts in CGI-mode")
 	flag.StringVar(&cfg.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")
 	flag.BoolVar(&cfg.exportAllVars, "export-all-vars", false, "export all current environment vars")
@@ -96,14 +96,14 @@ func getConfig() (*Config, error) {
 	flag.BoolVar(&cfg.noIndex, "no-index", false, "don't generate index page")
 	flag.BoolVar(&cfg.addExit, "add-exit", false, "add /exit command")
 	flag.StringVar(&cfg.shell, "shell", cfg.defaultShell, `custom shell or "" for execute without shell`)
-	flag.IntVar(&cfg.cache, "cache", 0, "caching command out (in seconds)")
+	flag.IntVar(&cfg.cache, "cache", 0, "caching command out (in `seconds`)")
 	flag.BoolVar(&cfg.oneThread, "one-thread", false, "run each shell command in one thread")
 	flag.BoolVar(&cfg.showErrors, "show-errors", false, "show the standard output even if the command exits with a non-zero exit code")
 	flag.BoolVar(&cfg.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
-	flag.StringVar(&cfg.cert, "cert", "", "SSL certificate path (if specified -cert/-key options - run https server)")
-	flag.StringVar(&cfg.key, "key", "", "SSL private key path")
+	flag.StringVar(&cfg.cert, "cert", "", "SSL certificate `path` (if specified -cert/-key options - run https server)")
+	flag.StringVar(&cfg.key, "key", "", "SSL private key `/path/...`")
 	flag.Var(&cfg.auth, "basic-auth", "setup HTTP Basic Authentication (\"user_name:password\"), can be used several times")
-	flag.IntVar(&cfg.timeout, "timeout", 0, "set timeout for execute shell command (in seconds)")
+	flag.IntVar(&cfg.timeout, "timeout", 0, "set `timeout` for execute shell command (in seconds)")
 
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
