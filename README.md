@@ -1,10 +1,11 @@
 shell2http
 ==========
 
-[![GoDoc](https://godoc.org/github.com/msoap/shell2http?status.svg)](https://godoc.org/github.com/msoap/shell2http)
+[![Go Reference](https://pkg.go.dev/badge/github.com/msoap/shell2http.svg)](https://pkg.go.dev/github.com/msoap/shell2http)
 [![Build Status](https://travis-ci.org/msoap/shell2http.svg?branch=master)](https://travis-ci.org/msoap/shell2http)
 [![Coverage Status](https://coveralls.io/repos/github/msoap/shell2http/badge.svg?branch=master)](https://coveralls.io/github/msoap/shell2http?branch=master)
 [![Report Card](https://goreportcard.com/badge/github.com/msoap/shell2http)](https://goreportcard.com/report/github.com/msoap/shell2http)
+[![Github Releases](https://img.shields.io/github/downloads/msoap/shell2http/total.svg)](https://github.com/msoap/shell2http/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/msoap/shell2http.svg?maxAge=3600)](https://hub.docker.com/r/msoap/shell2http/)
 [![Homebrew formula exists](https://img.shields.io/badge/homebrew-🍺-d7af72.svg)](https://github.com/msoap/shell2http#install)
 
