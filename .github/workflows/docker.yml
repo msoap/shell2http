@@ -1,0 +1,48 @@
+name: Publish Docker image
+
+on:
+  push:
+    branches: [ master ]
+  release:
+    types: [ created ]
+
+jobs:
+  push_to_registry:
+    name: Push Docker image to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Get the version
+        id: get_git_tag
+        run: echo ::set-output name=GIT_TAG::${GITHUB_REF/refs\/tags\//}
+        shell: bash
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v2
+        if: ${{ github.event_name == 'push' }}
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v6
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/shell2http:latest
+
+      - name: Push Tag to Docker Hub
+        uses: docker/build-push-action@v2
+        if: ${{ github.event_name == 'release' }}
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v6
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/shell2http:${{ steps.get_git_tag.outputs.GIT_TAG }}
