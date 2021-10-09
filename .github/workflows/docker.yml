@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
   release:
-    types: [ created ]
+    types: [ released ]
 
 jobs:
   push_to_registry:
@@ -16,7 +16,7 @@ jobs:
 
       - name: Get the version
         id: get_git_tag
-        run: echo ::set-output name=GIT_TAG::${GITHUB_REF/refs\/tags\//}
+        run: echo ::set-output name=GIT_TAG::${GITHUB_REF/refs\/tags\/v/}
         shell: bash
 
       - name: Set up QEMU
