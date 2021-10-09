@@ -1,5 +1,6 @@
 release:
   name_template: "{{ .Version }} - {{ .Date }}"
+  draft: true
   header: |
     [![Github Releases ({{ .Tag }})](https://img.shields.io/github/downloads/msoap/shell2http/{{ .Tag }}/total.svg)]() [![Github All Releases](https://img.shields.io/github/downloads/msoap/shell2http/total.svg)](https://github.com/msoap/shell2http/releases/latest)
 

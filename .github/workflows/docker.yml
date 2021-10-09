@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
   release:
-    types: [ released ]
+    types: [ published ]
 
 jobs:
   push_to_registry:
