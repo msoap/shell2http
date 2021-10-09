@@ -8,7 +8,7 @@ RUN apk add --no-cache git
 ADD . $GOPATH/src/github.com/msoap/shell2http
 WORKDIR $GOPATH/src/github.com/msoap/shell2http
 ENV CGO_ENABLED=0
-RUN go install -a -v -ldflags="-w -s" ./...
+RUN go build -v -ldflags="-w -s" -o /go/bin/shell2http .
 
 # final image
 FROM alpine
