@@ -1,0 +1,66 @@
+release:
+  name_template: "{{ .Version }} - {{ .Date }}"
+  header: |
+    [![Github Releases (by Release)](https://img.shields.io/github/downloads/msoap/shell2http/{{ .Tag }}/total.svg)]() [![Github All Releases](https://img.shields.io/github/downloads/msoap/shell2http/total.svg)](https://github.com/msoap/shell2http/releases/latest)
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - 386
+      - amd64
+      - arm
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w'
+
+nfpms:
+  - 
+    homepage: https://github.com/msoap/{{ .ProjectName }}
+    description: HTTP-server to execute shell commands. Designed for development, prototyping or remote control.
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: shell2http.1
+        dst: /usr/share/man/man1/shell2http.1
+      - src: LICENSE
+        dst: /usr/share/doc/shell2http/copyright
+      - src: README.md
+        dst: /usr/share/doc/shell2http/README.md
+
+archives:
+  -
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README*
+      - LICENSE*
+      - "*.1"
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}"
+
+changelog:
+  sort: desc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^Merge branch'
+      - '^go fmt'
