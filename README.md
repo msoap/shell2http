@@ -79,13 +79,13 @@ Notice: the snap-package has its own sandbox with the `/bin`, `/usr/bin` directo
 
 Download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (OS X/Linux/Windows/RaspberryPi)
 
-Docker users:
+For Docker users, availeble tags see in [Docker Hub](https://hub.docker.com/r/msoap/shell2http):
 
     docker pull msoap/shell2http
 
 Build from source (minimum Go version is 1.12):
 
-    go get -u github.com/msoap/shell2http
+    go install github.com/msoap/shell2http@latest
     # set link to your PATH if needed:
     ln -s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
 

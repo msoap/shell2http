@@ -98,7 +98,7 @@ Notice: the snap\-package has its own sandbox with the \fB/bin\fR, \fB/usr/bin\f
 Download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases/latest\fR (OS X/Linux/Windows/RaspberryPi)
 .
 .P
-Docker users:
+For Docker users, availeble tags see in Docker Hub \fIhttps://hub\.docker\.com/r/msoap/shell2http\fR:
 .
 .IP "" 4
 .
@@ -117,7 +117,7 @@ Build from source (minimum Go version is 1\.12):
 .
 .nf
 
-go get \-u github\.com/msoap/shell2http
+go install github\.com/msoap/shell2http@latest
 # set link to your PATH if needed:
 ln \-s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
 .
