@@ -2,9 +2,8 @@ name: Publish Docker image
 
 on:
   push:
-    branches: [ master ]
-  release:
-    types: [ published ]
+    tags:
+      - 'v*'
 
 jobs:
   push_to_registry:
@@ -35,18 +34,10 @@ jobs:
 
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
-        if: ${{ github.event_name == 'push' }}
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v6
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/shell2http:latest
-
-      - name: Push Tag to Docker Hub
-        uses: docker/build-push-action@v2
-        if: ${{ github.event_name == 'release' }}
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v6
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/shell2http:${{ steps.get_git_tag.outputs.GIT_TAG }}
+          tags: |
+            msoap/shell2http:latest
+            msoap/shell2http:${{ steps.get_git_tag.outputs.GIT_TAG }}
