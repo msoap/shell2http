@@ -22,7 +22,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - '-s -w'
+      - -s -w -X main.version={{ .Version }}
 
 nfpms:
   - 

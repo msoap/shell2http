@@ -110,12 +110,12 @@ func getConfig() (*Config, error) {
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
-	version := flag.Bool("version", false, "get version")
+	getVersion := flag.Bool("version", false, "get version")
 
 	flag.Parse()
 
-	if *version {
-		fmt.Println(VERSION)
+	if *getVersion {
+		fmt.Println(version)
 		os.Exit(0)
 	}
 

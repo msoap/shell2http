@@ -24,10 +24,9 @@ import (
 	raphanuscommon "github.com/msoap/raphanus/common"
 )
 
-const (
-	// VERSION - version
-	VERSION = "1.13"
+var version = "dev"
 
+const (
 	// PORT - default port for http-server
 	PORT = 8080
 

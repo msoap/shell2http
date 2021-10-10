@@ -8,7 +8,7 @@ RUN apk add --no-cache git
 ADD . $GOPATH/src/github.com/msoap/shell2http
 WORKDIR $GOPATH/src/github.com/msoap/shell2http
 ENV CGO_ENABLED=0
-RUN go build -v -trimpath -ldflags="-w -s" -o /go/bin/shell2http .
+RUN go build -v -trimpath -ldflags="-w -s -X 'main.version=$(git describe --abbrev=0 --tags | sed s/v//)'" -o /go/bin/shell2http .
 
 # final image
 FROM alpine

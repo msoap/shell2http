@@ -95,7 +95,7 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 // mwCommonHeaders - set common headers
 func mwCommonHeaders(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Set("Server", fmt.Sprintf("shell2http %s", VERSION))
+		rw.Header().Set("Server", fmt.Sprintf("shell2http %s", version))
 		handler.ServeHTTP(rw, req)
 	}
 }
