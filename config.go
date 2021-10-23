@@ -87,7 +87,7 @@ func getConfig() (*Config, error) {
 
 	flag.StringVar(&logFilename, "log", "", "log `filename`, default - STDOUT")
 	flag.BoolVar(&noLogTimestamp, "no-log-timestamp", false, "log output without timestamps")
-	flag.IntVar(&cfg.port, "port", PORT, "`port` for http server")
+	flag.IntVar(&cfg.port, "port", defaultPort, "`port` for http server")
 	flag.StringVar(&cfg.host, "host", "", "`host` for http server")
 	flag.BoolVar(&cfg.setCGI, "cgi", false, "run scripts in CGI-mode")
 	flag.StringVar(&cfg.exportVars, "export-vars", "", "export environment vars (\"VAR1,VAR2,...\")")

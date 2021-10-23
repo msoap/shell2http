@@ -319,7 +319,7 @@ func Test_parsePathAndCommands(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    []string
-		want    []Command
+		want    []command
 		wantErr bool
 	}{
 		{
@@ -355,19 +355,19 @@ func Test_parsePathAndCommands(t *testing.T) {
 		{
 			name:    "two arg",
 			args:    []string{"/date", "date"},
-			want:    []Command{{path: "/date", cmd: "date"}},
+			want:    []command{{path: "/date", cmd: "date"}},
 			wantErr: false,
 		},
 		{
 			name:    "four arg",
 			args:    []string{"/date", "date", "/", "echo index"},
-			want:    []Command{{path: "/date", cmd: "date"}, {path: "/", cmd: "echo index"}},
+			want:    []command{{path: "/date", cmd: "date"}, {path: "/", cmd: "echo index"}},
 			wantErr: false,
 		},
 		{
 			name:    "with http method",
 			args:    []string{"POST:/date", "date", "GET:/", "echo index"},
-			want:    []Command{{path: "/date", cmd: "date", httpMethod: "POST"}, {path: "/", cmd: "echo index", httpMethod: "GET"}},
+			want:    []command{{path: "/date", cmd: "date", httpMethod: "POST"}, {path: "/", cmd: "echo index", httpMethod: "GET"}},
 			wantErr: false,
 		},
 		{

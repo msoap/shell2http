@@ -27,8 +27,8 @@ import (
 var version = "dev"
 
 const (
-	// PORT - default port for http-server
-	PORT = 8080
+	// defaultPort - default port for http-server
+	defaultPort = 8080
 
 	// shBasicAuthVar - name of env var for basic auth credentials
 	shBasicAuthVar = "SH_BASIC_AUTH"
@@ -46,8 +46,8 @@ const (
 	maxMemoryForUploadFile = 65536
 )
 
-// INDEXHTML - Template for index page
-const INDEXHTML = `<!DOCTYPE html>
+// indexTmpl - template for index page
+const indexTmpl = `<!DOCTYPE html>
 <!-- Served by shell2http/%s -->
 <html>
 <head>
@@ -75,8 +75,8 @@ const INDEXHTML = `<!DOCTYPE html>
 </html>
 `
 
-// Command - one command type
-type Command struct {
+// command - one command
+type command struct {
 	path       string
 	cmd        string
 	httpMethod string
@@ -84,8 +84,8 @@ type Command struct {
 }
 
 // parsePathAndCommands - get all commands with pathes
-func parsePathAndCommands(args []string) ([]Command, error) {
-	var cmdHandlers []Command
+func parsePathAndCommands(args []string) ([]command, error) {
+	var cmdHandlers []command
 
 	if len(args) < 2 || len(args)%2 == 1 {
 		return cmdHandlers, fmt.Errorf("requires a pair of path and shell command")
@@ -104,7 +104,7 @@ func parsePathAndCommands(args []string) ([]Command, error) {
 		if len(pathParts) != 3 {
 			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
 		}
-		cmdHandlers = append(cmdHandlers, Command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
+		cmdHandlers = append(cmdHandlers, command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
 
 		uniqPaths[path] = true
 	}
@@ -264,8 +264,8 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 }
 
 // setupHandlers - setup http handlers
-func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB) ([]Command, error) {
-	resultHandlers := []Command{}
+func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB) ([]command, error) {
+	resultHandlers := []command{}
 	indexLiHTML := ""
 	existsRootPath := false
 
@@ -301,7 +301,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 		if err != nil {
 			return nil, err
 		}
-		resultHandlers = append(resultHandlers, Command{
+		resultHandlers = append(resultHandlers, command{
 			path:    path,
 			handler: handler,
 			cmd:     strings.Join(cmdsForLog[path], "; "),
@@ -310,7 +310,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 	// --------------
 	if appConfig.addExit {
-		resultHandlers = append(resultHandlers, Command{
+		resultHandlers = append(resultHandlers, command{
 			path: "/exit",
 			cmd:  "/exit",
 			handler: func(rw http.ResponseWriter, _ *http.Request) {
@@ -324,8 +324,8 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
-		indexHTML := fmt.Sprintf(INDEXHTML, version, indexLiHTML)
-		resultHandlers = append(resultHandlers, Command{
+		indexHTML := fmt.Sprintf(indexTmpl, version, indexLiHTML)
+		resultHandlers = append(resultHandlers, command{
 			path: "/",
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
