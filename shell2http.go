@@ -48,6 +48,7 @@ const (
 
 // INDEXHTML - Template for index page
 const INDEXHTML = `<!DOCTYPE html>
+<!-- Served by shell2http/%s -->
 <html>
 <head>
     <title>❯ shell2http</title>
@@ -323,7 +324,7 @@ func setupHandlers(cmdHandlers []Command, appConfig Config, cacheTTL raphanus.DB
 
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
-		indexHTML := fmt.Sprintf(INDEXHTML, indexLiHTML)
+		indexHTML := fmt.Sprintf(INDEXHTML, version, indexLiHTML)
 		resultHandlers = append(resultHandlers, Command{
 			path: "/",
 			cmd:  "index page",
