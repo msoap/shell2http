@@ -2,7 +2,7 @@ shell2http
 ==========
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/msoap/shell2http.svg)](https://pkg.go.dev/github.com/msoap/shell2http)
-[![Build Status](https://travis-ci.org/msoap/shell2http.svg?branch=master)](https://travis-ci.org/msoap/shell2http)
+[![Go build status](https://github.com/msoap/shell2http/actions/workflows/go.yml/badge.svg)](https://github.com/msoap/shell2http/actions/workflows/go.yml)
 [![Coverage Status](https://coveralls.io/repos/github/msoap/shell2http/badge.svg?branch=master)](https://coveralls.io/github/msoap/shell2http?branch=master)
 [![Report Card](https://goreportcard.com/badge/github.com/msoap/shell2http)](https://goreportcard.com/report/github.com/msoap/shell2http)
 [![Github Releases](https://img.shields.io/github/downloads/msoap/shell2http/total.svg)](https://github.com/msoap/shell2http/releases)
