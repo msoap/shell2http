@@ -4,16 +4,19 @@ Settings through 2 command line arguments, path and shell command.
 By default bind to :8080.
 
 Install/update:
+
 	go get -u github.com/msoap/shell2http
 	ln -s $GOPATH/bin/shell2http ~/bin/shell2http
 
 MacOS install:
+
 	brew tap msoap/tools
 	brew install shell2http
 	# update:
 	brew upgrade shell2http
 
 Usage:
+
 	shell2http [options] /path "shell command" /path2 "shell command2" ...
 	options:
 		-host="host"      : host for http server, default - all interfaces
@@ -43,15 +46,16 @@ Usage:
 
 In the "-form" mode, variables are available for shell scripts:
 
- - $v_NNN -- data from query parameter with name "NNN" (example: `http://localhost:8080/path?NNN=123`)
- - $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
- - $filename_ID -- uploaded file name from browser
+  - $v_NNN -- data from query parameter with name "NNN" (example: `http://localhost:8080/path?NNN=123`)
+  - $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
+  - $filename_ID -- uploaded file name from browser
 
 To setup multiple auth users, you can specify the -basic-auth option multiple times.
 The credentials for basic authentication may also be provided via the SH_BASIC_AUTH environment variable.
 You can specify the preferred HTTP-method (via "METHOD:" prefix for path): shell2http GET:/date date
 
 Examples:
+
 	shell2http /top "top -l 1 | head -10"
 	shell2http /date date /ps "ps aux"
 	shell2http -export-all-vars /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
@@ -112,6 +116,5 @@ Get four random OS X wallpapers
 		/wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
 
 More examples on https://github.com/msoap/shell2http/wiki
-
 */
 package main

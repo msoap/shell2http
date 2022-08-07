@@ -386,13 +386,13 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	}
 }
 
-/* parse headers from script output:
+/*
+	parse headers from script output:
 
 Header-name1: value1\n
 Header-name2: value2\n
 \n
 text
-
 */
 func parseCGIHeaders(shellOut string) (string, map[string]string) {
 	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shellOut, 2)
