@@ -227,7 +227,7 @@ func Test_main(t *testing.T) {
 	)
 
 	testHTTP(t, "GET", "http://localhost:"+port+"/error", "",
-		func(res string) bool { return strings.HasPrefix(res, "exec error:") },
+		func(res string) bool { return strings.Contains(res, "exec error:") },
 		"5. error",
 	)
 
