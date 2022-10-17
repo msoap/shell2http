@@ -139,13 +139,13 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 	return func(rw http.ResponseWriter, req *http.Request) {
 		shellOut, exitCode, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
 		if err != nil {
-			log.Println("exec error: ", err)
+			log.Println(string(shellOut), "\nexec error: ", err)
 		}
 
 		rw.Header().Set("X-Shell2http-Exit-Code", strconv.Itoa(exitCode))
 
 		if err != nil && !appConfig.showErrors {
-			responseWrite(rw, "exec error: "+err.Error())
+			responseWrite(rw, string(shellOut)+"\nexec error: "+err.Error())
 		} else {
 			outText := string(shellOut)
 			if appConfig.setCGI {
