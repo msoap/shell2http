@@ -76,6 +76,22 @@ brew upgrade shell2http
 .IP "" 0
 .
 .P
+Download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases/latest\fR (MacOS/Linux/Windows/RaspberryPi)
+.
+.P
+For Docker users, availeble tags see in Docker Hub \fIhttps://hub\.docker\.com/r/msoap/shell2http\fR:
+.
+.IP "" 4
+.
+.nf
+
+docker pull msoap/shell2http
+.
+.fi
+.
+.IP "" 0
+.
+.P
 Using snap (Ubuntu or any Linux distribution with snap):
 .
 .IP "" 4
@@ -96,23 +112,7 @@ sudo snap refresh shell2http
 .IP "" 0
 .
 .P
-Notice: the snap\-package has its own sandbox with the \fB/bin\fR, \fB/usr/bin\fR directories which are not equal to system\-wide \fBPATH\fR directories\.
-.
-.P
-Download binaries from: releases \fIhttps://github\.com/msoap/shell2http/releases/latest\fR (OS X/Linux/Windows/RaspberryPi)
-.
-.P
-For Docker users, availeble tags see in Docker Hub \fIhttps://hub\.docker\.com/r/msoap/shell2http\fR:
-.
-.IP "" 4
-.
-.nf
-
-docker pull msoap/shell2http
-.
-.fi
-.
-.IP "" 0
+\fINotice\fR: the snap\-package has its own sandbox with the \fB/bin\fR, \fB/usr/bin\fR directories which are not equal to system\-wide \fBPATH\fR directories and commands may not work as expected or not work at all\.
 .
 .P
 Build from source (minimum Go version is 1\.12):
@@ -124,6 +124,19 @@ Build from source (minimum Go version is 1\.12):
 go install github\.com/msoap/shell2http@latest
 # set link to your PATH if needed:
 ln \-s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Compile for MIPS CPU (for example, for some WiFi routers like Asus):
+.
+.IP "" 4
+.
+.nf
+
+GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build \-trimpath \-ldflags="\-w \-s" \-o shell2http \.
 .
 .fi
 .

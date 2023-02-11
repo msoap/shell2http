@@ -69,6 +69,12 @@ MacOS:
     # update:
     brew upgrade shell2http
 
+Download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (MacOS/Linux/Windows/RaspberryPi)
+
+For Docker users, availeble tags see in [Docker Hub](https://hub.docker.com/r/msoap/shell2http):
+
+    docker pull msoap/shell2http
+
 Using snap (Ubuntu or any Linux distribution with snap):
 
     # install stable version:
@@ -80,19 +86,18 @@ Using snap (Ubuntu or any Linux distribution with snap):
     # update
     sudo snap refresh shell2http
 
-Notice: the snap-package has its own sandbox with the `/bin`, `/usr/bin` directories which are not equal to system-wide `PATH` directories.
-
-Download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (OS X/Linux/Windows/RaspberryPi)
-
-For Docker users, availeble tags see in [Docker Hub](https://hub.docker.com/r/msoap/shell2http):
-
-    docker pull msoap/shell2http
+*Notice*: the snap-package has its own sandbox with the `/bin`, `/usr/bin` directories which are not equal to system-wide `PATH` directories
+and commands may not work as expected or not work at all.
 
 Build from source (minimum Go version is 1.12):
 
     go install github.com/msoap/shell2http@latest
     # set link to your PATH if needed:
     ln -s $(go env GOPATH)/bin/shell2http ~/bin/shell2http
+
+Compile for MIPS CPU (for example, for some WiFi routers like Asus):
+
+    GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -trimpath -ldflags="-w -s" -o shell2http .
 
 Examples
 --------
