@@ -205,7 +205,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	finalizer := func() {}
 	if appConfig.setForm {
 		var err error
-		if finalizer, err = getForm(osExecCommand, req); err != nil {
+		if finalizer, err = getForm(osExecCommand, req, appConfig.formCheckRe); err != nil {
 			log.Printf("parse form failed: %s", err)
 		}
 	}
@@ -420,7 +420,7 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 }
 
 // getForm - parse form into environment vars, also handle uploaded files
-func getForm(cmd *exec.Cmd, req *http.Request) (func(), error) {
+func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func(), error) {
 	tempDir := ""
 	safeFileNameRe := regexp.MustCompile(`[^\.\w\-]+`)
 	finalizer := func() {
@@ -441,8 +441,22 @@ func getForm(cmd *exec.Cmd, req *http.Request) (func(), error) {
 		}
 	}
 
-	for key, value := range req.Form {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+key, strings.Join(value, ",")))
+	for key, values := range req.Form {
+		if checkFormRe != nil {
+			checkedValues := []string{}
+			for _, v := range values {
+				if checkFormRe.MatchString(v) {
+					checkedValues = append(checkedValues, v)
+				}
+			}
+			values = checkedValues
+		}
+		if len(values) == 0 {
+			continue
+		}
+
+		value := strings.Join(values, ",")
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+key, value))
 	}
 
 	// handle uploaded files, save all to temporary files and set variables filename_XXX, filepath_XXX
