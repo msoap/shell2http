@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -47,25 +48,26 @@ func (au authUsers) isAllow(user, pass string) bool {
 
 // Config - config struct
 type Config struct {
-	port          int       // server port
-	cache         int       // caching command out (in seconds)
-	timeout       int       // timeout for shell command (in seconds)
-	host          string    // server host
-	exportVars    string    // list of environment vars for export to script
-	shell         string    // custom shell
-	defaultShell  string    // shell by default
-	defaultShOpt  string    // shell option for one-liner (-c or /C)
-	cert          string    // SSL certificate
-	key           string    // SSL private key path
-	auth          authUsers // basic authentication
-	exportAllVars bool      // export all current environment vars
-	setCGI        bool      // set CGI variables
-	setForm       bool      // parse form from URL
-	noIndex       bool      // don't generate index page
-	addExit       bool      // add /exit command
-	oneThread     bool      // run each shell commands in one thread
-	showErrors    bool      // returns the standard output even if the command exits with a non-zero exit code
-	includeStderr bool      // also returns output written to stderr (default is stdout only)
+	port          int            // server port
+	cache         int            // caching command out (in seconds)
+	timeout       int            // timeout for shell command (in seconds)
+	host          string         // server host
+	exportVars    string         // list of environment vars for export to script
+	shell         string         // custom shell
+	defaultShell  string         // shell by default
+	defaultShOpt  string         // shell option for one-liner (-c or /C)
+	cert          string         // SSL certificate
+	key           string         // SSL private key path
+	auth          authUsers      // basic authentication
+	exportAllVars bool           // export all current environment vars
+	setCGI        bool           // set CGI variables
+	setForm       bool           // parse form from URL
+	noIndex       bool           // don't generate index page
+	addExit       bool           // add /exit command
+	oneThread     bool           // run each shell commands in one thread
+	showErrors    bool           // returns the standard output even if the command exits with a non-zero exit code
+	includeStderr bool           // also returns output written to stderr (default is stdout only)
+	formCheckRe   *regexp.Regexp // regexp for check form fields
 }
 
 // getConfig - parse arguments
@@ -104,6 +106,8 @@ func getConfig() (*Config, error) {
 	flag.StringVar(&cfg.key, "key", "", "SSL private key `/path/...`")
 	flag.Var(&cfg.auth, "basic-auth", "setup HTTP Basic Authentication (\"user_name:password\"), can be used several times")
 	flag.IntVar(&cfg.timeout, "timeout", 0, "set `timeout` for execute shell command (in seconds)")
+
+	formCheck := flag.String("form-check", "", "regexp for check form fields (pass only vars that match the regexp)")
 
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [options] /path \"shell command\" /path2 \"shell command2\"\n", os.Args[0])
@@ -147,6 +151,14 @@ func getConfig() (*Config, error) {
 		if _, err := exec.LookPath(cfg.shell); err != nil {
 			return nil, fmt.Errorf("an error has occurred while searching for shell executable %q: %s", cfg.shell, err)
 		}
+	}
+
+	if formCheck != nil && len(*formCheck) > 0 {
+		re, err := regexp.Compile(*formCheck)
+		if err != nil {
+			return nil, fmt.Errorf("an error has occurred while compiling regexp %s: %s", *formCheck, err)
+		}
+		cfg.formCheckRe = re
 	}
 
 	return &cfg, nil

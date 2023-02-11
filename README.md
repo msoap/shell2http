@@ -11,7 +11,6 @@ shell2http
 
 HTTP-server to execute shell commands. Designed for development, prototyping or remote control.
 Settings through two command line arguments, path and shell command.
-By default bind to :8080.
 
 Usage
 -----
@@ -21,6 +20,7 @@ Usage
         -host="host"      : host IP for http server (default bind to all interfaces)
         -port=NNNN        : port for http server, 0 - to receive a random port (default 8080)
         -form             : parse query into environment vars, handle uploaded files
+        -form-check       : regexp for check form fields (pass only vars that match the regexp)
         -cgi              : run scripts in CGI-mode:
                             - set environment variables with HTTP-request information
                             - write POST|PUT|PATCH-data to script STDIN (if is not set -form)
@@ -49,6 +49,11 @@ In the `-form` mode, variables are available for shell scripts:
   * $v_NNN -- data from query parameter with name "NNN" (example: `http://localhost:8080/path?NNN=123`)
   * $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
   * $filename_ID -- uploaded file name from browser
+
+With `-form-check` option you can specify the regular expression for checking the form fields.
+For example, if you want to allow only variables that contain the only digits,
+you can specify the following option: `-form-check='^[0-9]+$'`.
+Then only requests like `http://localhost:8080/path?NNN=123` will be produce variable `$v_NNN`.
 
 To setup multiple auth users, you can specify the `-basic-auth` option multiple times.
 The credentials for basic authentication may also be provided via the `SH_BASIC_AUTH` environment variable.
