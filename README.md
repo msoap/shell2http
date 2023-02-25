@@ -64,8 +64,7 @@ Install
 
 MacOS:
 
-    brew tap msoap/tools
-    brew install shell2http
+    brew install msoap/tools/shell2http
     # update:
     brew upgrade shell2http
 
