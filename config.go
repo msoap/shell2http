@@ -67,6 +67,7 @@ type Config struct {
 	oneThread     bool           // run each shell commands in one thread
 	showErrors    bool           // returns the standard output even if the command exits with a non-zero exit code
 	includeStderr bool           // also returns output written to stderr (default is stdout only)
+	intServerErr  bool           // return 500 error if shell status code != 0
 	formCheckRe   *regexp.Regexp // regexp for check form fields
 }
 
@@ -102,6 +103,7 @@ func getConfig() (*Config, error) {
 	flag.BoolVar(&cfg.oneThread, "one-thread", false, "run each shell command in one thread")
 	flag.BoolVar(&cfg.showErrors, "show-errors", false, "show the standard output even if the command exits with a non-zero exit code")
 	flag.BoolVar(&cfg.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
+	flag.BoolVar(&cfg.intServerErr, "500", false, "return 500 error if shell exit code != 0")
 	flag.StringVar(&cfg.cert, "cert", "", "SSL certificate `path` (if specified -cert/-key options - run https server)")
 	flag.StringVar(&cfg.key, "key", "", "SSL private key `/path/...`")
 	flag.Var(&cfg.auth, "basic-auth", "setup HTTP Basic Authentication (\"user_name:password\"), can be used several times")
