@@ -20,7 +20,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            ${{ secrets.DOCKER_USERNAME }}/raphanus
+            msoap/shell2http
           tags: |
             type=semver,pattern={{version}}
 
