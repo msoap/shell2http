@@ -142,16 +142,15 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 			log.Printf("out: %s, exec error: %s", string(shellOut), err)
 		}
 
-		rw.Header().Set("X-Shell2http-Exit-Code", strconv.Itoa(exitCode))
+		customStatusCode := 0
+		outText := string(shellOut)
 
 		if err != nil && !appConfig.showErrors {
-			responseWrite(rw, fmt.Sprintf("%s\nexec error: %s", string(shellOut), err))
+			outText = fmt.Sprintf("%s\nexec error: %s", string(shellOut), err)
 		} else {
-			outText := string(shellOut)
 			if appConfig.setCGI {
 				var headers map[string]string
 				outText, headers = parseCGIHeaders(outText)
-				customStatusCode := 0
 
 				for headerKey, headerValue := range headers {
 					switch headerKey {
@@ -170,14 +169,18 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 
 					rw.Header().Set(headerKey, headerValue)
 				}
-
-				if customStatusCode > 0 {
-					rw.WriteHeader(customStatusCode)
-				}
 			}
-
-			responseWrite(rw, outText)
 		}
+
+		rw.Header().Set("X-Shell2http-Exit-Code", strconv.Itoa(exitCode))
+
+		if customStatusCode > 0 {
+			rw.WriteHeader(customStatusCode)
+		} else if exitCode > 0 && appConfig.intServerErr {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
+
+		responseWrite(rw, outText)
 	}
 }
 
@@ -408,7 +411,7 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 				headersMap[headerParts[1]] = headerParts[2]
 			} else {
 				// headers is not valid, return all text
-				return shellOut, map[string]string{}
+				return shellOut, nil
 			}
 		}
 
@@ -416,7 +419,7 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 	}
 
 	// headers don't found, return all text
-	return shellOut, map[string]string{}
+	return shellOut, nil
 }
 
 // getForm - parse form into environment vars, also handle uploaded files

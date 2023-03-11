@@ -22,7 +22,7 @@ func Test_parseCGIHeaders(t *testing.T) {
 		{
 			in:      "Some text",
 			out:     "Some text",
-			headers: map[string]string{},
+			headers: nil,
 		},
 		{
 			in:      "Location: url\n\nSome text",
@@ -42,12 +42,12 @@ func Test_parseCGIHeaders(t *testing.T) {
 		{
 			in:      "Some text\nText\n\ntext",
 			out:     "Some text\nText\n\ntext",
-			headers: map[string]string{},
+			headers: nil,
 		},
 		{
 			in:      "Some text\nText: value in text\n\ntext",
 			out:     "Some text\nText: value in text\n\ntext",
-			headers: map[string]string{},
+			headers: nil,
 		},
 		{
 			in:      "Text::::\n\ntext",
@@ -62,12 +62,12 @@ func Test_parseCGIHeaders(t *testing.T) {
 		{
 			in:      "Text:     \n\ntext",
 			out:     "Text:     \n\ntext",
-			headers: map[string]string{},
+			headers: nil,
 		},
 		{
 			in:      "Header: value\nText:     \n\ntext",
 			out:     "Header: value\nText:     \n\ntext",
-			headers: map[string]string{},
+			headers: nil,
 		},
 		{
 			in:      "Location: url\r\nX-Name:  x-value\r\n\r\nOn Windows",
