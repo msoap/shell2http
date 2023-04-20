@@ -576,6 +576,21 @@ func errChainAll(chainFuncs ...func() error) error {
 	return resErr
 }
 
+// mwLimitHeaderLength - limits the length of headers in the request
+func mwLimitHeaderLength(next http.HandlerFunc, maxHeaderLength int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for key, values := range r.Header {
+			for _, value := range values {
+				if len(key)+len(value) > maxHeaderLength {
+					http.Error(w, "Request header too long", http.StatusRequestHeaderFieldsTooLarge)
+					return
+				}
+			}
+		}
+		next(w, r)
+	}
+}
+
 func main() {
 	appConfig, err := getConfig()
 	if err != nil {
@@ -605,6 +620,7 @@ func main() {
 			handlerFunc = mwOneThread(handlerFunc)
 		}
 		handlerFunc = mwLogging(mwCommonHeaders(handlerFunc))
+        handlerFunc = mwLimitHeaderLength(handlerFunc, 1000) // Set a limit of 1000 characters
 
 		http.HandleFunc(handler.path, handlerFunc)
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)

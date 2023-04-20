@@ -96,9 +96,15 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 func mwCommonHeaders(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Server", fmt.Sprintf("shell2http %s", version))
+        rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+        rw.Header().Set("X-Content-Type-Options", "nosniff")
+        rw.Header().Set("X-Frame-Options", "DENY")
+        rw.Header().Set("X-XSS-Protection", "1; mode=block")
+        rw.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; img-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self'")
 		handler.ServeHTTP(rw, req)
 	}
 }
+
 
 // mwOneThread - run handler in one thread
 func mwOneThread(handler http.HandlerFunc) http.HandlerFunc {
