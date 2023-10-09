@@ -22,6 +22,7 @@ Usage:
 		-host="host"      : host for http server, default - all interfaces
 		-port=NNNN        : port for http server, 0 - to receive a random port, default - 8080
 		-form             : parse query into environment vars, handle uploaded files
+		-form-check       : regexp for check form fields (pass only vars that match the regexp)
 		-cgi              : run scripts in CGI-mode:
 		                    - set environment variables with HTTP-request information
 		                    - write POST|PUT|PATCH-data to script STDIN (if not set -form)
@@ -36,6 +37,7 @@ Usage:
 		-one-thread       : run each shell command in one thread
 		-show-errors      : show the standard output even if the command exits with a non-zero exit code
 		-include-stderr   : include stderr to output (default is stdout only)
+		-500              : return 500 error if shell exit code != 0
 		-cert=cert.pem    : SSL certificate path (if specified -cert/-key options - run https server)
 		-key=key.pem      : SSL private key path
 		-basic-auth=""	  : setup HTTP Basic Authentication ("user_name:password"), can be used several times
