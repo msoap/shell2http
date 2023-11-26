@@ -269,7 +269,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 // setupHandlers - setup http handlers
 func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB) ([]command, error) {
 	resultHandlers := []command{}
-	indexLiHTML := ""
+	indexLiHTML := []string{}
 	existsRootPath := false
 
 	// map[path][http-method]handler
@@ -289,7 +289,7 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 		if row.httpMethod != "" {
 			methodDesc = row.httpMethod + ": "
 		}
-		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s<span></li>`, path, methodDesc, path, html.EscapeString(cmd))
+		indexLiHTML = append(indexLiHTML, fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s<span></li>`, path, methodDesc, path, html.EscapeString(cmd)))
 		cmdsForLog[path] = append(cmdsForLog[path], cmd)
 
 		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
@@ -322,12 +322,12 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 			},
 		})
 
-		indexLiHTML += fmt.Sprintf(`<li><a href=".%s">%s</a></li>`, "/exit", "/exit")
+		indexLiHTML = append(indexLiHTML, fmt.Sprintf(`<li><a href=".%s">%s</a></li>`, "/exit", "/exit"))
 	}
 
 	// --------------
 	if !appConfig.noIndex && !existsRootPath {
-		indexHTML := fmt.Sprintf(indexTmpl, version, indexLiHTML)
+		indexHTML := fmt.Sprintf(indexTmpl, version, strings.Join(indexLiHTML, "\n"))
 		resultHandlers = append(resultHandlers, command{
 			path: "/",
 			cmd:  "index page",
