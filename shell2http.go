@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -243,8 +244,12 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	if appConfig.includeStderr {
 		shellOut, err = osExecCommand.CombinedOutput()
 	} else {
-		osExecCommand.Stderr = os.Stderr
+		var stderrBuf bytes.Buffer
+		osExecCommand.Stderr = &stderrBuf
 		shellOut, err = osExecCommand.Output()
+		if stderrBuf.Len() > 0 {
+			log.Printf("stderr: %s", stderrBuf.String())
+		}
 	}
 
 	if waitPipeWrite {
