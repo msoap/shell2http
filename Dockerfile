@@ -3,6 +3,11 @@
 # build image
 FROM --platform=$BUILDPLATFORM golang:alpine as go_builder
 
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
 RUN apk add --no-cache git
 
 ADD . $GOPATH/src/github.com/msoap/shell2http
@@ -15,6 +20,7 @@ ENV GOARM=6
 ENV GOARCH=$TARGETARCH
 ENV GOOS=linux
 
+RUN echo "Building for $GOOS/$GOARCH"
 RUN go build -v -trimpath -ldflags="-w -s -X 'main.version=$(git describe --abbrev=0 --tags | sed s/v//)'" -o /go/bin/shell2http .
 
 # final image
