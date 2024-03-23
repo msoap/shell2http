@@ -1,5 +1,5 @@
 name: shell2http
-version: '1.16.0'
+version: '1.17.0'
 summary: Executing shell commands via HTTP server
 description: |
   HTTP-server for executing shell commands. Designed for develop, prototype or remote control.
