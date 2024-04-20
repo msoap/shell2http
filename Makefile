@@ -29,7 +29,7 @@ build-docker-image:
 	rm -f $(APP_NAME)
 
 generate-manpage:
-	cat README.md | grep -v "^\[" | perl -pe 's/<details><summary>/### /' > $(APP_NAME).md
+	cat README.md | grep -v "^\[" | grep -v '^<img' | perl -pe 's/<details><summary>/### /' > $(APP_NAME).md
 	docker run --rm -v $$PWD:/app -w /app msoap/ruby-ronn ronn $(APP_NAME).md
 	mv ./$(APP_NAME) ./$(APP_NAME).1
 	rm ./$(APP_NAME).{md,html}
