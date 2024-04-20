@@ -1,5 +1,3 @@
-<img align="right" width="128" height="128" alt="shell2http logo" src="https://github.com/msoap/shell2http/assets/844117/d1b56204-2d7e-4ee7-878c-0cbc739e5c68">
-
 shell2http
 ==========
 
@@ -10,6 +8,8 @@ shell2http
 [![Github Releases](https://img.shields.io/github/downloads/msoap/shell2http/total.svg)](https://github.com/msoap/shell2http/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/msoap/shell2http.svg?maxAge=3600)](https://hub.docker.com/r/msoap/shell2http/)
 [![Homebrew formula exists](https://img.shields.io/badge/homebrew-🍺-d7af72.svg)](https://github.com/msoap/shell2http#install)
+
+<img align="right" width="128" height="128" alt="shell2http logo" src="https://github.com/msoap/shell2http/assets/844117/d1b56204-2d7e-4ee7-878c-0cbc739e5c68">
 
 HTTP-server designed to execute shell commands. It is suitable for development, prototyping or remote control,
 facilitates rapid iteration and testing of shell-based functionalities.
