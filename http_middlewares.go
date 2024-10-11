@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+const (
+	healthcheckPath = "/healthcheck"
+)
+
 // mwMultiMethod - produce handler for several http methods
 func mwMultiMethod(in map[string]http.HandlerFunc) (http.HandlerFunc, error) {
 	switch len(in) {
@@ -57,7 +61,7 @@ func mwMethodOnly(handler http.HandlerFunc, method string) http.HandlerFunc {
 func mwBasicAuth(handler http.HandlerFunc, users authUsers) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		reqUser, reqPass, ok := req.BasicAuth()
-		if !ok || !users.isAllow(reqUser, reqPass) {
+		if (!ok || !users.isAllow(reqUser, reqPass)) && req.URL.Path != healthcheckPath {
 			rw.Header().Set("WWW-Authenticate", `Basic realm="Please enter user and password"`)
 			http.Error(rw, "name/password is required", http.StatusUnauthorized)
 			return

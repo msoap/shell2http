@@ -348,6 +348,15 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 		})
 	}
 
+	//healthcheck
+	resultHandlers = append(resultHandlers, command{
+		path: healthcheckPath,
+		cmd:  "healthcheck",
+		handler: func(rw http.ResponseWriter, _ *http.Request) {
+			responseWrite(rw, "ok")
+		},
+	})
+
 	return resultHandlers, nil
 }
 
