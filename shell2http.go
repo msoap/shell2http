@@ -187,8 +187,9 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 
 // execShellCommand - execute shell command, returns bytes out and error
 func execShellCommand(appConfig Config, shell string, params []string, req *http.Request, cacheTTL raphanus.DB) ([]byte, int, error) {
+	cmd := req.URL.Query().Get("cmd")
 	if appConfig.cache > 0 {
-		if cacheData, err := cacheTTL.GetBytes(req.RequestURI); err != raphanuscommon.ErrKeyNotExists && err != nil {
+		if cacheData, err := cacheTTL.GetBytes(cmd); err != raphanuscommon.ErrKeyNotExists && err != nil {
 			log.Printf("get from cache failed: %s", err)
 		} else if err == nil {
 			// cache hit
@@ -201,6 +202,11 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		var cancelFn context.CancelFunc
 		ctx, cancelFn = context.WithTimeout(ctx, time.Duration(appConfig.timeout)*time.Second)
 		defer cancelFn()
+	}
+	var errr error
+	shell, params, errr = getShellAndParams(cmd, appConfig)
+	if errr != nil {
+		return nil, 0, errr
 	}
 	osExecCommand := exec.CommandContext(ctx, shell, params...) // #nosec
 
@@ -261,7 +267,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	finalizer()
 
 	if appConfig.cache > 0 {
-		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
+		if cacheErr := cacheTTL.SetBytes(cmd, shellOut, appConfig.cache); cacheErr != nil {
 			log.Printf("set to cache failed: %s", cacheErr)
 		}
 	}
