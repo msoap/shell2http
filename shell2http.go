@@ -523,7 +523,7 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 
 // isMultipartFormData - check header for multipart/form-data
 func isMultipartFormData(headers http.Header) bool {
-	if contentType, ok := headers["Content-Type"]; ok && len(contentType) == 1 && strings.HasPrefix(contentType[0], "multipart/form-data; ") {
+	if contentType, ok := headers["Content-Type"]; ok && len(contentType) == 1 && strings.HasPrefix(contentType[0], "multipart/form-data;") {
 		return true
 	}
 
