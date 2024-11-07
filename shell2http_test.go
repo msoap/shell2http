@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -247,6 +248,62 @@ func Test_main(t *testing.T) {
 		},
 		"8. POST with GET",
 	)
+
+}
+
+func Test_mainBasicAuth(t *testing.T) {
+	port := getFreePort(t)
+	os.Args = []string{"shell2http",
+		"-basic-auth=user:pass",
+		"-one-thread",
+		"-port=" + port,
+		"GET:/echoauth", "echo 123",
+	}
+
+	//clean before launching another test
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError) //flags are now reset
+	http.DefaultServeMux = new(http.ServeMux)
+	// end clean
+
+	go main()
+	time.Sleep(100 * time.Millisecond) // wait for up http server
+
+	// hide stderr
+	oldStderr := os.Stderr // keep backup of the real stderr
+	newStderr, err := os.Open("/dev/null")
+	if err != nil {
+		t.Errorf("open /dev/null: %s", err)
+	}
+	os.Stderr = newStderr
+	defer func() {
+		os.Stderr = oldStderr
+		err := newStderr.Close()
+		if err != nil {
+			t.Errorf("Stderr Close failed: %s", err)
+		}
+	}()
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/echoauth", "",
+		func(res string) bool {
+			return res == "name/password is required\n"
+		},
+		"1. no auth",
+	)
+
+	testHTTP(t, "GET", "http://user:pass@localhost:"+port+"/echoauth", "",
+		func(res string) bool {
+			return res == "123\n"
+		},
+		"2. auth",
+	)
+
+	testHTTP(t, "GET", "http://localhost:"+port+"/healthcheck", "",
+		func(res string) bool {
+			return res == "ok"
+		},
+		"3. healthcheck",
+	)
+
 }
 
 func Test_errChain(t *testing.T) {
