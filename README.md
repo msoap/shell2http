@@ -109,7 +109,6 @@ Examples
     shell2http /top "top -l 1 | head -10"
     shell2http /date date /ps "ps aux"
     shell2http -export-all-vars /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
-    shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
     shell2http -export-vars=GOPATH /get 'echo $GOPATH'
 
 <details><summary>HTML calendar for current year</summary>
@@ -119,7 +118,7 @@ shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br
 ```
 </details>
 
-<details><summary>Get URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
+<details><summary>Using URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
 
 ```sh
 shell2http -form /form 'echo $v_from, $v_to'
@@ -143,7 +142,7 @@ shell2http -form \
     POST:/file 'cat $filepath_uplfile > uploaded_file.dat; echo Ok'
 ```
 
-Testing upload file with curl:
+Testing by upload file with curl:
 
     curl -i -F uplfile=@some/file/path 'http://localhost:8080/file'
 
@@ -164,7 +163,7 @@ shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} sec
 ```
 </details>
 
-<details><summary>Proxy with cache in files (for debug with production API with rate limit)</summary>
+<details><summary>Proxy with cache in files (for debug API with rate limit)</summary>
 get `http://api.url/` as `http://localhost:8080/get?url=http://api.url/`
 
 ```sh
@@ -188,14 +187,6 @@ shell2http /get  'osascript -e "output volume of (get volume settings)"' \
 ```sh
 shell2http /play_pause 'osascript -e "tell application \"Vox\" to playpause" && echo ok' \
            /get_info 'osascript -e "tell application \"Vox\"" -e "\"Artist: \" & artist & \"\n\" & \"Album: \" & album & \"\n\" & \"Track: \" & track" -e "end tell"'
-```
-</details>
-
-<details><summary>Get four random OS X wallpapers</summary>
-
-```sh
-shell2http /img 'cat "$(ls "/Library/Desktop Pictures/"*.jpg | ruby -e "puts STDIN.readlines.shuffle[0]")"' \
-           /wallpapers 'echo "<html><h3>OS X Wallpapers</h3>"; seq 4 | xargs -I@ echo "<img src=/img?@ width=500>"'
 ```
 </details>
 
@@ -264,7 +255,7 @@ Generate self-signed certificate:
 See also
 --------
 
- * Create Telegram bot from command-line - [shell2telegram](https://github.com/msoap/shell2telegram)
+ * Command-line tool for creating Telegram bot - [shell2telegram](https://github.com/msoap/shell2telegram)
  * A http daemon for local development - [devd](https://github.com/cortesi/devd)
  * Turn any program that uses STDIN/STDOUT into a WebSocket server - [websocketd](https://github.com/joewalnes/websocketd)
  * The same tool configurable via JSON - [webhook](https://github.com/adnanh/webhook)
