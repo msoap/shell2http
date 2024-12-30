@@ -241,6 +241,9 @@ Build and run container:
     docker build -f test.Dockerfile -t date-server .
     docker run --rm -p 8080:8080 date-server
 
+In some cases, such as when multiple shell scripts are running and the main script doesn't wait them properly,
+you can use `--init` option for `docker run` for prevent zombie processes, see Docker [run reference](https://docs.docker.com/reference/cli/docker/container/run/#init) and about [multiple processes in a container](https://docs.docker.com/engine/containers/multi-service_container/).
+
 SSL
 ---
 

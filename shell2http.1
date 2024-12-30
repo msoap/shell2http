@@ -359,6 +359,9 @@ docker run \-\-rm \-p 8080:8080 date\-server
 .
 .IP "" 0
 .
+.P
+In some cases, such as when multiple shell scripts are running and the main script doesn\'t wait them properly, you can use \fB\-\-init\fR option for \fBdocker run\fR for prevent zombie processes, see Docker run reference \fIhttps://docs\.docker\.com/reference/cli/docker/container/run/#init\fR and about multiple processes in a container \fIhttps://docs\.docker\.com/engine/containers/multi\-service_container/\fR\.
+.
 .SH "SSL"
 Run https server:
 .
