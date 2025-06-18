@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ['1.22.x', '1.23.x']
+        go: ['1.23.x', '1.24.x']
     steps:
     - uses: actions/checkout@v4
 
@@ -36,7 +36,7 @@ jobs:
       run: go test -race -v ./...
 
     - name: Coveralls
-      if: ${{ startsWith(matrix.go, '1.23') && github.event_name == 'push' }}
+      if: ${{ startsWith(matrix.go, '1.24') && github.event_name == 'push' }}
       env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
