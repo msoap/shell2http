@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net"
@@ -429,10 +428,10 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 
 // getForm - parse form into environment vars, also handle uploaded files
 func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func(), error) {
-	tempDir := ""
+	tempDirs := []string{}
 	safeFileNameRe := regexp.MustCompile(`[^\.\w\-]+`)
 	finalizer := func() {
-		if tempDir != "" {
+		for _, tempDir := range tempDirs {
 			if err := os.RemoveAll(tempDir); err != nil {
 				log.Println(err)
 			}
@@ -474,6 +473,7 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 				var (
 					uplFile     multipart.File
 					outFile     *os.File
+					tempDir     string
 					err         error
 					reqFileName = value[0].Filename
 				)
@@ -482,11 +482,14 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 					uplFile, err = value[0].Open()
 					return err
 				}, func() error {
-					tempDir, err = ioutil.TempDir("", "shell2http_")
+					tempDir, err = os.MkdirTemp("", "shell2http_")
+					if err == nil {
+						tempDirs = append(tempDirs, tempDir)
+					}
 					return err
 				}, func() error {
 					prefix := safeFileNameRe.ReplaceAllString(reqFileName, "")
-					outFile, err = ioutil.TempFile(tempDir, prefix+"_")
+					outFile, err = os.CreateTemp(tempDir, prefix+"_")
 					return err
 				}, func() error {
 					_, err = io.Copy(outFile, uplFile)
