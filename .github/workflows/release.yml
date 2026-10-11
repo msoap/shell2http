@@ -25,7 +25,7 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> 2.18'
-          args: release --rm-dist
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Post release
