@@ -45,6 +45,7 @@ Usage
         -basic-auth=""    : setup HTTP Basic Authentication ("user_name:password"), can be used several times
         -timeout=N        : set timeout for execute shell command (in seconds)
         -no-log-timestamp : log output without timestamps
+        -avoid-log-for=url: don't log requests for specified paths ("path1,path2,...")
         -version
         -help
 

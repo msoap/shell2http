@@ -337,7 +337,9 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
 				if req.URL.Path != "/" {
-					log.Printf("%s - 404", req.URL.Path)
+					if !appConfig.isAvoidLog(req.URL.Path) {
+						log.Printf("%s - 404", req.URL.Path)
+					}
 					http.NotFound(rw, req)
 					return
 				}
@@ -612,7 +614,10 @@ func main() {
 		if appConfig.oneThread {
 			handlerFunc = mwOneThread(handlerFunc)
 		}
-		handlerFunc = mwLogging(mwCommonHeaders(handlerFunc))
+		handlerFunc = mwCommonHeaders(handlerFunc)
+		if !appConfig.isAvoidLog(handler.path) {
+			handlerFunc = mwLogging(handlerFunc, appConfig.isAvoidLog)
+		}
 
 		http.HandleFunc(handler.path, handlerFunc)
 		log.Printf("register: %s (%s)\n", handler.path, handler.cmd)

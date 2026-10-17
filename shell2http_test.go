@@ -1,16 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/msoap/raphanus"
 )
 
 func Test_parseCGIHeaders(t *testing.T) {
@@ -409,3 +414,216 @@ func Test_parsePathAndCommands(t *testing.T) {
 		})
 	}
 }
+
+func Test_isAvoidLog(t *testing.T) {
+	tests := []struct {
+		name       string
+		avoidFor   string
+		checkPaths map[string]bool
+	}{
+		{
+			name:     "empty config",
+			avoidFor: "",
+			checkPaths: map[string]bool{
+				"/health": false,
+				"/":       false,
+				"/date":   false,
+			},
+		},
+		{
+			name:     "single path without slash",
+			avoidFor: "health",
+			checkPaths: map[string]bool{
+				"/health":  true,
+				"/health/": true,
+				"/date":    false,
+			},
+		},
+		{
+			name:     "single path with slash",
+			avoidFor: "/health",
+			checkPaths: map[string]bool{
+				"/health":  true,
+				"/health/": true,
+				"/date":    false,
+			},
+		},
+		{
+			name:     "single path with trailing slash",
+			avoidFor: "/health/",
+			checkPaths: map[string]bool{
+				"/health":  true,
+				"/health/": true,
+				"/date":    false,
+			},
+		},
+		{
+			name:     "multiple paths with spaces and slashes",
+			avoidFor: " health, /metrics , /status/ ",
+			checkPaths: map[string]bool{
+				"/health":   true,
+				"/health/":  true,
+				"/metrics":  true,
+				"/metrics/": true,
+				"/status":   true,
+				"/status/":  true,
+				"/date":     false,
+			},
+		},
+		{
+			name:     "root path",
+			avoidFor: "/",
+			checkPaths: map[string]bool{
+				"/":       true,
+				"/health": false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{avoidLogFor: tt.avoidFor}
+			if len(cfg.avoidLogFor) > 0 {
+				cfg.avoidLogPaths = make(map[string]bool)
+				for _, rawPath := range strings.Split(cfg.avoidLogFor, ",") {
+					p := strings.TrimSpace(rawPath)
+					if p == "" {
+						continue
+					}
+					if !strings.HasPrefix(p, "/") {
+						p = "/" + p
+					}
+					cfg.avoidLogPaths[p] = true
+					if len(p) > 1 && strings.HasSuffix(p, "/") {
+						cfg.avoidLogPaths[strings.TrimSuffix(p, "/")] = true
+					}
+				}
+			}
+
+			for path, expected := range tt.checkPaths {
+				if got := cfg.isAvoidLog(path); got != expected {
+					t.Errorf("isAvoidLog(%q) = %v, expected %v", path, got, expected)
+				}
+			}
+		})
+	}
+}
+
+func Test_mwLogging_avoidLog(t *testing.T) {
+	cfg := Config{
+		avoidLogPaths: map[string]bool{
+			"/health":  true,
+			"/health/": true,
+		},
+	}
+
+	dummyHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte("ok"))
+	})
+
+	mw := mwLogging(dummyHandler, cfg.isAvoidLog)
+
+	var logBuf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(origOutput)
+
+	// 1. Avoided path should not produce any log
+	logBuf.Reset()
+	reqHealth := httptest.NewRequest("GET", "/health", nil)
+	rwHealth := httptest.NewRecorder()
+	mw.ServeHTTP(rwHealth, reqHealth)
+	if rwHealth.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rwHealth.Code)
+	}
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no log for /health, got: %s", logBuf.String())
+	}
+
+	// 2. Avoided path with query string should not produce any log
+	logBuf.Reset()
+	reqHealthQuery := httptest.NewRequest("GET", "/health?probe=1", nil)
+	rwHealthQuery := httptest.NewRecorder()
+	mw.ServeHTTP(rwHealthQuery, reqHealthQuery)
+	if rwHealthQuery.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rwHealthQuery.Code)
+	}
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no log for /health?probe=1, got: %s", logBuf.String())
+	}
+
+	// 3. Non-avoided path should produce log
+	logBuf.Reset()
+	reqDate := httptest.NewRequest("GET", "/date", nil)
+	rwDate := httptest.NewRecorder()
+	mw.ServeHTTP(rwDate, reqDate)
+	if rwDate.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rwDate.Code)
+	}
+	if !strings.Contains(logBuf.String(), `GET /date`) {
+		t.Errorf("expected log for /date, got: %s", logBuf.String())
+	}
+
+	// 4. Backward compatibility: mwLogging without isAvoidLog
+	mwDefault := mwLogging(dummyHandler)
+	logBuf.Reset()
+	mwDefault.ServeHTTP(rwHealth, reqHealth)
+	if !strings.Contains(logBuf.String(), `GET /health`) {
+		t.Errorf("expected log for default mwLogging, got: %s", logBuf.String())
+	}
+}
+
+func Test_index404_avoidLog(t *testing.T) {
+	cfg := Config{
+		avoidLogPaths: map[string]bool{
+			"/health":  true,
+			"/health/": true,
+		},
+	}
+	handlers, err := setupHandlers([]command{{path: "/date", cmd: "date"}}, cfg, raphanus.DB{})
+	if err != nil {
+		t.Fatalf("setupHandlers failed: %s", err)
+	}
+
+	var rootHandler http.HandlerFunc
+	for _, h := range handlers {
+		if h.path == "/" {
+			rootHandler = h.handler
+			break
+		}
+	}
+	if rootHandler == nil {
+		t.Fatal("root handler not found")
+	}
+
+	var logBuf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(origOutput)
+
+	// 404 for avoided path /health
+	logBuf.Reset()
+	reqHealth := httptest.NewRequest("GET", "http://localhost/health", nil)
+	rwHealth := httptest.NewRecorder()
+	rootHandler.ServeHTTP(rwHealth, reqHealth)
+	if rwHealth.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rwHealth.Code)
+	}
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no 404 log for /health, got: %s", logBuf.String())
+	}
+
+	// 404 for non-avoided path /unknown
+	logBuf.Reset()
+	reqUnknown := httptest.NewRequest("GET", "http://localhost/unknown", nil)
+	rwUnknown := httptest.NewRecorder()
+	rootHandler.ServeHTTP(rwUnknown, reqUnknown)
+	if rwUnknown.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rwUnknown.Code)
+	}
+	if !strings.Contains(logBuf.String(), "/unknown - 404") {
+		t.Errorf("expected 404 log for /unknown, got: %s", logBuf.String())
+	}
+}
+

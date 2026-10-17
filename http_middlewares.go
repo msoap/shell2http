@@ -68,8 +68,12 @@ func mwBasicAuth(handler http.HandlerFunc, users authUsers) http.HandlerFunc {
 }
 
 // mwLogging - add logging for handler
-func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
+func mwLogging(handler http.HandlerFunc, isAvoidLog ...func(path string) bool) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
+		if len(isAvoidLog) > 0 && isAvoidLog[0] != nil && isAvoidLog[0](req.URL.Path) {
+			handler.ServeHTTP(rw, req)
+			return
+		}
 		remoteAddr := req.RemoteAddr
 		if realIP, ok := req.Header["X-Real-Ip"]; ok && len(realIP) > 0 {
 			remoteAddr = realIP[0] + ", " + remoteAddr

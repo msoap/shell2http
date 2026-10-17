@@ -68,6 +68,8 @@ type Config struct {
 	showErrors    bool           // returns the standard output even if the command exits with a non-zero exit code
 	includeStderr bool           // also returns output written to stderr (default is stdout only)
 	intServerErr  bool           // return 500 error if shell status code != 0
+	avoidLogFor   string         // don't log requests for specified paths (comma separated: "path1,path2,...")
+	avoidLogPaths map[string]bool // parsed set of paths to avoid logging
 	formCheckRe   *regexp.Regexp // regexp for check form fields
 }
 
@@ -104,6 +106,7 @@ func getConfig() (*Config, error) {
 	flag.BoolVar(&cfg.showErrors, "show-errors", false, "show the standard output even if the command exits with a non-zero exit code")
 	flag.BoolVar(&cfg.includeStderr, "include-stderr", false, "include stderr to output (default is stdout only)")
 	flag.BoolVar(&cfg.intServerErr, "500", false, "return 500 error if shell exit code != 0")
+	flag.StringVar(&cfg.avoidLogFor, "avoid-log-for", "", "don't log requests for specified paths (\"path1,path2,...\")")
 	flag.StringVar(&cfg.cert, "cert", "", "SSL certificate `path` (if specified -cert/-key options - run https server)")
 	flag.StringVar(&cfg.key, "key", "", "SSL private key `/path/...`")
 	flag.Var(&cfg.auth, "basic-auth", "setup HTTP Basic Authentication (\"user_name:password\"), can be used several times")
@@ -163,7 +166,38 @@ func getConfig() (*Config, error) {
 		cfg.formCheckRe = re
 	}
 
+	if len(cfg.avoidLogFor) > 0 {
+		cfg.avoidLogPaths = make(map[string]bool)
+		for _, rawPath := range strings.Split(cfg.avoidLogFor, ",") {
+			p := strings.TrimSpace(rawPath)
+			if p == "" {
+				continue
+			}
+			if !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			cfg.avoidLogPaths[p] = true
+			if len(p) > 1 && strings.HasSuffix(p, "/") {
+				cfg.avoidLogPaths[strings.TrimSuffix(p, "/")] = true
+			}
+		}
+	}
+
 	return &cfg, nil
+}
+
+// isAvoidLog - check if path is in avoid-log list
+func (cfg Config) isAvoidLog(path string) bool {
+	if len(cfg.avoidLogPaths) == 0 {
+		return false
+	}
+	if cfg.avoidLogPaths[path] {
+		return true
+	}
+	if len(path) > 1 && strings.HasSuffix(path, "/") {
+		return cfg.avoidLogPaths[strings.TrimSuffix(path, "/")]
+	}
+	return cfg.avoidLogPaths[path+"/"]
 }
 
 // readableURL - get readable URL for logging
