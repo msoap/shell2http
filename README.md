@@ -78,20 +78,6 @@ For Docker users, availeble tags see in [Docker Hub](https://hub.docker.com/r/ms
 
     docker pull msoap/shell2http
 
-Using snap (Ubuntu or any Linux distribution with snap):
-
-    # install stable version:
-    sudo snap install shell2http
-    
-    # install the latest version:
-    sudo snap install --edge shell2http
-    
-    # update
-    sudo snap refresh shell2http
-
-*Notice*: the snap-package has its own sandbox with the `/bin`, `/usr/bin` directories which are not equal to system-wide `PATH` directories
-and commands may not work as expected or not work at all.
-
 Build from source (minimum Go version is 1.12):
 
     go install github.com/msoap/shell2http@latest
