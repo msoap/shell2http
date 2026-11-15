@@ -162,6 +162,19 @@ shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} sec
 ```
 </details>
 
+<details><summary>Run command in background (don't wait for it to finish)</summary>
+
+Redirect stdout and stderr of the background command, otherwise the request waits for it to finish:
+
+```sh
+shell2http /run 'some_command >/dev/null 2>&1 & echo started'
+# or keep output in log file:
+shell2http /run 'some_command >/tmp/cmd.log 2>&1 & echo started'
+```
+
+The background process keeps running even after shell2http server is stopped.
+</details>
+
 <details><summary>Proxy with cache in files (for debug API with rate limit)</summary>
 get `http://api.url/` as `http://localhost:8080/get?url=http://api.url/`
 
