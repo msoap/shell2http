@@ -33,7 +33,7 @@ Usage
         -export-all-vars  : export all current environment vars
         -no-index         : don't generate index page
         -add-exit         : add /exit command
-        -log=filename     : log filename, default - STDOUT
+        -log=filename     : log filename, default - STDERR
         -shell="shell"    : shell for execute command, "" - without shell (default "sh")
         -cache=N          : caching command out for N seconds
         -one-thread       : run each shell command in one thread
