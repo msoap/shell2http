@@ -26,7 +26,7 @@ Usage
         -form-check       : regexp for check form fields (pass only vars that match the regexp)
         -cgi              : run scripts in CGI-mode:
                             - set environment variables with HTTP-request information
-                            - write POST|PUT|PATCH-data to script STDIN (if is not set -form)
+                            - write POST|PUT|PATCH-data to script STDIN (if is not set -form or body is not form data)
                             - parse headers from script (eg: "Location: URL\n\n")
         -export-vars=var  : export environment vars ("VAR1,VAR2,...")
                             by default export PATH, HOME, LANG, USER, TMPDIR

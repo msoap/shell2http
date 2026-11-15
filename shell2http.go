@@ -224,7 +224,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		setCGIEnv(osExecCommand, req, appConfig)
 
 		// get request body data data to stdin of script (if not parse form vars above)
-		if (req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") && !appConfig.setForm {
+		if (req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") && (!appConfig.setForm || !isFormData(req.Header)) {
 			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
 				log.Println("write request body data to shell failed:", pipeErr)
 			} else {
@@ -426,10 +426,14 @@ func parseCGIHeaders(shellOut string) (string, map[string]string) {
 	return shellOut, nil
 }
 
+var (
+	safeFileNameRe  = regexp.MustCompile(`[^\.\w\-]+`)
+	unsafeVarNameRe = regexp.MustCompile(`\W`)
+)
+
 // getForm - parse form into environment vars, also handle uploaded files
 func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func(), error) {
 	tempDirs := []string{}
-	safeFileNameRe := regexp.MustCompile(`[^\.\w\-]+`)
 	finalizer := func() {
 		for _, tempDir := range tempDirs {
 			if err := os.RemoveAll(tempDir); err != nil {
@@ -463,12 +467,13 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 		}
 
 		value := strings.Join(values, ",")
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+key, value))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+unsafeVarNameRe.ReplaceAllString(key, "_"), value))
 	}
 
 	// handle uploaded files, save all to temporary files and set variables filename_XXX, filepath_XXX
 	if req.MultipartForm != nil {
 		for key, value := range req.MultipartForm.File {
+			key = unsafeVarNameRe.ReplaceAllString(key, "_")
 			if len(value) == 1 {
 				var (
 					uplFile     multipart.File
@@ -531,6 +536,11 @@ func isMultipartFormData(headers http.Header) bool {
 	}
 
 	return false
+}
+
+// isFormData - check that request body will be parsed by -form (urlencoded or multipart/form-data)
+func isFormData(headers http.Header) bool {
+	return strings.HasPrefix(strings.ToLower(headers.Get("Content-Type")), "application/x-www-form-urlencoded") || isMultipartFormData(headers)
 }
 
 // proxySystemEnv - proxy some system vars
