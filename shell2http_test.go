@@ -7,10 +7,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/msoap/raphanus"
 )
 
 func Test_parseCGIHeaders(t *testing.T) {
@@ -171,6 +175,10 @@ func testHTTP(t *testing.T, method, url, postData string, fn func(body string) b
 }
 
 func Test_main(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows: requires unix echo and cat executables")
+	}
+
 	port := getFreePort(t)
 	os.Args = []string{"shell2http",
 		"-add-exit",
@@ -180,7 +188,7 @@ func Test_main(t *testing.T) {
 		"-export-vars=HOME",
 		"-one-thread",
 		"-shell=",
-		"-log=/dev/null",
+		"-log=" + os.DevNull,
 		"-port=" + port,
 		"GET:/echo", "echo 123",
 		"POST:/form", "echo var=$v_var",
@@ -193,18 +201,19 @@ func Test_main(t *testing.T) {
 
 	// hide stderr
 	oldStderr := os.Stderr // keep backup of the real stderr
-	newStderr, err := os.Open("/dev/null")
+	newStderr, err := os.Open(os.DevNull)
 	if err != nil {
-		t.Errorf("open /dev/null: %s", err)
+		t.Errorf("open %s: %s", os.DevNull, err)
+	} else {
+		os.Stderr = newStderr
+		defer func() {
+			os.Stderr = oldStderr
+			err := newStderr.Close()
+			if err != nil {
+				t.Errorf("Stderr Close failed: %s", err)
+			}
+		}()
 	}
-	os.Stderr = newStderr
-	defer func() {
-		os.Stderr = oldStderr
-		err := newStderr.Close()
-		if err != nil {
-			t.Errorf("Stderr Close failed: %s", err)
-		}
-	}()
 
 	testHTTP(t, "GET", "http://localhost:"+port+"/", "",
 		func(res string) bool { return len(res) > 0 && strings.HasPrefix(res, "<!DOCTYPE html>") },
@@ -407,5 +416,65 @@ func Test_parsePathAndCommands(t *testing.T) {
 				t.Errorf("parsePathAndCommands() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_execShellCommand_ProcessStateNil(t *testing.T) {
+	appConfig := Config{}
+	req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Executing a nonexistent executable with shell="" should not panic with nil pointer dereference
+	shellOut, exitCode, err := execShellCommand(appConfig, "nonexistent_command_12345", nil, req, raphanus.DB{})
+	if err == nil {
+		t.Errorf("expected error for nonexistent command, got nil")
+	}
+	if exitCode == 0 {
+		t.Errorf("expected non-zero exit code on failure, got %d", exitCode)
+	}
+	if len(shellOut) != 0 {
+		t.Errorf("expected empty shellOut, got %s", string(shellOut))
+	}
+}
+
+func Test_setCGIEnv_MultiHeadersAndContent(t *testing.T) {
+	appConfig := Config{
+		host: "example.com",
+		port: 8080,
+	}
+	req, err := http.NewRequest(http.MethodPost, "http://example.com/cgi?q=1", strings.NewReader("hello world"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("Accept-Encoding", "gzip")
+	req.Header.Add("Accept-Encoding", "deflate")
+	req.Header.Set("Content-Type", "text/plain")
+	req.ContentLength = 11
+	req.RemoteAddr = "192.0.2.1" // without port to test fallback
+
+	cmd := &exec.Cmd{}
+	setCGIEnv(cmd, req, appConfig)
+
+	envMap := make(map[string]string)
+	for _, env := range cmd.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	if envMap["HTTP_ACCEPT_ENCODING"] != "gzip, deflate" {
+		t.Errorf("expected 'gzip, deflate', got %q", envMap["HTTP_ACCEPT_ENCODING"])
+	}
+	if envMap["CONTENT_LENGTH"] != "11" {
+		t.Errorf("expected CONTENT_LENGTH=11, got %q", envMap["CONTENT_LENGTH"])
+	}
+	if envMap["CONTENT_TYPE"] != "text/plain" {
+		t.Errorf("expected CONTENT_TYPE='text/plain', got %q", envMap["CONTENT_TYPE"])
+	}
+	if envMap["REMOTE_ADDR"] != "192.0.2.1" {
+		t.Errorf("expected REMOTE_ADDR='192.0.2.1', got %q", envMap["REMOTE_ADDR"])
 	}
 }

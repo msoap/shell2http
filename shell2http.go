@@ -265,7 +265,12 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		}
 	}
 
-	exitCode := osExecCommand.ProcessState.ExitCode()
+	exitCode := 0
+	if osExecCommand.ProcessState != nil {
+		exitCode = osExecCommand.ProcessState.ExitCode()
+	} else if err != nil {
+		exitCode = 1
+	}
 
 	return shellOut, exitCode, err
 }
@@ -365,12 +370,12 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 		if envName == "PROXY" {
 			continue
 		}
-		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, headerValue[0]))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, strings.Join(headerValue, ", ")))
 	}
 
 	remoteHost, remotePort, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		log.Printf("failed to parse remote address %s: %s", req.RemoteAddr, err)
+		remoteHost = req.RemoteAddr
 	}
 	CGIVars := [...]struct {
 		cgiName, value string
@@ -390,6 +395,13 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 
 	for _, row := range CGIVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgiName, row.value))
+	}
+
+	if req.ContentLength > 0 {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("CONTENT_LENGTH=%d", req.ContentLength))
+	}
+	if contentType := req.Header.Get("Content-Type"); contentType != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("CONTENT_TYPE=%s", contentType))
 	}
 }
 
