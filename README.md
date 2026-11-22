@@ -60,6 +60,12 @@ With `-form-check` option you can specify the regular expression for checking th
 For example, if you want to allow only variables that contain the only digits,
 you can specify the following option: `-form-check='^[0-9]+$'`.
 Then only requests like `http://localhost:8080/path?NNN=123` will be produce variable `$v_NNN`.
+A parameter passed several times (`?NNN=1&NNN=2`) is joined with `,`, and the joined value must match too
+(use `-form-check='^[0-9,]+$'` to allow it). The regexp also applies to the uploaded file name:
+a file whose name does not match is skipped, without `$filepath_ID` and `$filename_ID`.
+
+If the form can not be parsed (malformed body, body over the size limit, failed saving of an uploaded file),
+the command is not run and the client gets a `400`, `413` or `500` error.
 
 To setup multiple auth users, you can specify the `-basic-auth` option multiple times.
 The credentials for basic authentication may also be provided via the `SH_BASIC_AUTH` environment variable.

@@ -149,6 +149,13 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 
 	return func(rw http.ResponseWriter, req *http.Request) {
 		shellOut, exitCode, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
+		var formErr *formError
+		if errors.As(err, &formErr) {
+			// the command was not run, don't show internal details (like temp paths) to the client
+			log.Printf("parse form failed: %s", err)
+			http.Error(rw, http.StatusText(formErr.status), formErr.status)
+			return
+		}
 		if err != nil {
 			log.Printf("out: %s, exec error: %s", string(shellOut), err)
 		}
@@ -226,7 +233,9 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	if appConfig.setForm {
 		var err error
 		if finalizer, err = getForm(osExecCommand, req, appConfig.formCheckRe); err != nil {
-			log.Printf("parse form failed: %s", err)
+			// fail closed: don't run the command with some of the form variables missing
+			finalizer()
+			return nil, 0, err
 		}
 	}
 
@@ -470,7 +479,54 @@ var (
 	unsafeVarNameRe = regexp.MustCompile(`\W`)
 )
 
-// getForm - parse form into environment vars, also handle uploaded files
+// formError - the form could not be parsed or the uploaded files could not be saved,
+// the command must not be run, status is the HTTP status for the response
+type formError struct {
+	status int
+	err    error
+}
+
+func (e *formError) Error() string { return e.err.Error() }
+func (e *formError) Unwrap() error { return e.err }
+
+// newFormParseError - wrap an error of parsing the request body, a body over the limit gets 413
+func newFormParseError(err error) error {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) || errors.Is(err, multipart.ErrMessageTooLarge) {
+		return &formError{status: http.StatusRequestEntityTooLarge, err: err}
+	}
+
+	return &formError{status: http.StatusBadRequest, err: err}
+}
+
+// isFormValueAllowed - check a value with the -form-check regexp, without the regexp all values are allowed
+func isFormValueAllowed(value string, checkFormRe *regexp.Regexp) bool {
+	return checkFormRe == nil || checkFormRe.MatchString(value)
+}
+
+// formValue - join the values of a form field with ",", with -form-check only the values
+// that match the regexp are used, and the joined value must match it too
+func formValue(values []string, checkFormRe *regexp.Regexp) (string, bool) {
+	checkedValues := make([]string, 0, len(values))
+	for _, v := range values {
+		if isFormValueAllowed(v, checkFormRe) {
+			checkedValues = append(checkedValues, v)
+		}
+	}
+	if len(checkedValues) == 0 {
+		return "", false
+	}
+
+	value := strings.Join(checkedValues, ",")
+	if !isFormValueAllowed(value, checkFormRe) {
+		return "", false
+	}
+
+	return value, true
+}
+
+// getForm - parse form into environment vars, also handle uploaded files.
+// On error the command must not be run, the returned finalizer must be called anyway.
 func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func(), error) {
 	tempDirs := []string{}
 	finalizer := func() {
@@ -482,30 +538,21 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 	}
 
 	if err := req.ParseForm(); err != nil {
-		return finalizer, err
+		return finalizer, newFormParseError(err)
 	}
 
 	if isMultipartFormData(req.Header) {
 		if err := req.ParseMultipartForm(maxMemoryForUploadFile); err != nil {
-			return finalizer, err
+			return finalizer, newFormParseError(err)
 		}
 	}
 
 	for key, values := range req.Form {
-		if checkFormRe != nil {
-			checkedValues := []string{}
-			for _, v := range values {
-				if checkFormRe.MatchString(v) {
-					checkedValues = append(checkedValues, v)
-				}
-			}
-			values = checkedValues
-		}
-		if len(values) == 0 {
+		value, ok := formValue(values, checkFormRe)
+		if !ok {
 			continue
 		}
 
-		value := strings.Join(values, ",")
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+unsafeVarNameRe.ReplaceAllString(key, "_"), value))
 	}
 
@@ -513,7 +560,8 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 	if req.MultipartForm != nil {
 		for key, value := range req.MultipartForm.File {
 			key = unsafeVarNameRe.ReplaceAllString(key, "_")
-			if len(value) == 1 {
+			// a file whose name (raw, from the client) doesn't pass -form-check is skipped entirely
+			if len(value) == 1 && isFormValueAllowed(value[0].Filename, checkFormRe) {
 				var (
 					uplFile     multipart.File
 					outFile     *os.File
@@ -552,11 +600,11 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 					return nil
 				})
 				if errClose != nil {
-					return finalizer, errClose
+					return finalizer, &formError{status: http.StatusInternalServerError, err: errClose}
 				}
 
 				if errCreate != nil {
-					return finalizer, errCreate
+					return finalizer, &formError{status: http.StatusInternalServerError, err: errCreate}
 				}
 
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "filepath_"+key, outFile.Name()))
