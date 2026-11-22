@@ -53,6 +53,20 @@ func getStreamHandler(appConfig Config, shell string, params []string, mode outp
 			}
 		}
 
+		// when the command has exited, the rest of a stalled upload is not needed
+		shellCmd.interruptInput = func() {
+			setDeadline(rc.SetReadDeadline, time.Now())
+		}
+
+		// when the command is killed (timeout, shutdown, client disconnect), a write to a client that doesn't read
+		// the response must not block forever: the output copying (and so cmd.Wait) and the end of the response
+		// (exit event or trailer) get waitDelay
+		writeDeadlineSet := make(chan struct{})
+		stopWriteDeadline := context.AfterFunc(ctx, func() {
+			defer close(writeDeadlineSet)
+			setDeadline(rc.SetWriteDeadline, time.Now().Add(waitDelay))
+		})
+
 		header := rw.Header()
 		header.Set("Cache-Control", "no-cache")
 		header.Set("X-Accel-Buffering", "no") // don't buffer the response in nginx
@@ -78,10 +92,11 @@ func getStreamHandler(appConfig Config, shell string, params []string, mode outp
 			return nil
 		}}
 
+		out := &flushWriter{w: rw, rc: rc}
 		var exitCode int
 		switch mode {
 		case outputSSE:
-			events := &sseWriter{w: rw, rc: rc}
+			events := &sseWriter{out: out}
 			stdout, stderr := events.lines(""), stderrLog
 			if appConfig.includeStderr {
 				stderr = events.lines("stderr")
@@ -94,16 +109,24 @@ func getStreamHandler(appConfig Config, shell string, params []string, mode outp
 
 			_ = events.send("exit", []byte(strconv.Itoa(exitCode)))
 		default:
-			stdout := &flushWriter{w: rw, rc: rc}
 			var stderr io.Writer = stderrLog
 			if appConfig.includeStderr {
-				stderr = stdout
+				stderr = out
 			}
 
-			exitCode, err = shellCmd.run(stdout, stderr)
+			exitCode, err = shellCmd.run(out, stderr)
 			_ = stderrLog.flush()
 
 			rw.Header().Set(exitCodeHeader, strconv.Itoa(exitCode))
+		}
+
+		// net/http doesn't reset the write deadline for the next request on a keep-alive connection (without WriteTimeout),
+		// after a failed write the connection is not reused, keep the deadline for the end of the response (the trailer)
+		if !stopWriteDeadline() {
+			<-writeDeadlineSet
+			if !out.failed {
+				setDeadline(rc.SetWriteDeadline, time.Time{})
+			}
 		}
 
 		// a client disconnect is the usual end of an endless stream, don't log it as an error
@@ -113,26 +136,36 @@ func getStreamHandler(appConfig Config, shell string, params []string, mode outp
 	}
 }
 
-// flushWriter - write to the response and send it to the client at once
+// setDeadline - set a read or write deadline of the response (http.ResponseController)
+func setDeadline(setFn func(time.Time) error, deadline time.Time) {
+	if err := setFn(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		log.Printf("set deadline failed: %s", err)
+	}
+}
+
+// flushWriter - write to the response and send it to the client at once, not safe for concurrent use
 type flushWriter struct {
-	w  io.Writer
-	rc *http.ResponseController
+	w      io.Writer
+	rc     *http.ResponseController
+	failed bool // a write has failed (the client has gone or doesn't read the response)
 }
 
 func (fw *flushWriter) Write(data []byte) (int, error) {
 	n, err := fw.w.Write(data)
+	if err == nil {
+		err = fw.rc.Flush()
+	}
 	if err != nil {
-		return n, err
+		fw.failed = true
 	}
 
-	return n, fw.rc.Flush()
+	return n, err
 }
 
 // sseWriter - send Server-Sent Events to the client, safe for concurrent use (stdout and stderr are written concurrently)
 type sseWriter struct {
-	mu sync.Mutex
-	w  io.Writer
-	rc *http.ResponseController
+	mu  sync.Mutex
+	out *flushWriter
 }
 
 // send - send one event, "" - default event type ("message"), each line of data is sent in its own "data:" field
@@ -154,10 +187,8 @@ func (sw *sseWriter) send(event string, data []byte) error {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 
-	if _, err := sw.w.Write(msg.Bytes()); err != nil {
-		return err
-	}
-	return sw.rc.Flush()
+	_, err := sw.out.Write(msg.Bytes())
+	return err
 }
 
 // lines - get a writer that sends each line of the output as an event

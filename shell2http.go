@@ -370,6 +370,10 @@ type shellCommand struct {
 	cmd       *exec.Cmd
 	finalizer func()     // removes temporary files of the request
 	pipeErrCh chan error // result of writing the request body to the command stdin, nil if the body is not written
+
+	// called after the command has exited, if the request body is still being read (a stalled upload),
+	// to interrupt the reading, nil - wait for it as long as it takes (the buffered mode)
+	interruptInput func()
 }
 
 // newShellCommand - prepare the command for the request: environment, form variables and uploaded files,
@@ -451,7 +455,17 @@ func (sc *shellCommand) run(stdout, stderr io.Writer) (int, error) {
 	}
 
 	if sc.pipeErrCh != nil {
-		if pipeErr := <-sc.pipeErrCh; pipeErr != nil {
+		var pipeErr error
+		select {
+		case pipeErr = <-sc.pipeErrCh:
+		default:
+			// the request body is still being read (eg: a stalled upload)
+			if sc.interruptInput != nil {
+				sc.interruptInput()
+			}
+			pipeErr = <-sc.pipeErrCh
+		}
+		if pipeErr != nil {
 			log.Println("write request body data to shell failed:", pipeErr)
 		}
 	}

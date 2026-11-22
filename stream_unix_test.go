@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -253,6 +254,62 @@ func Test_getStreamHandler_CGIBody(t *testing.T) {
 	lines := strings.Fields(string(out))
 	if len(lines) != 2 || lines[1] != strconv.Itoa(len(body)) {
 		t.Errorf("got %q, want the whole body (%d bytes) on stdin", out, len(body))
+	}
+}
+
+// dialStalled - send the raw request and don't read the response
+func dialStalled(t *testing.T, server *httptest.Server, rawRequest string) net.Conn {
+	t.Helper()
+
+	conn, err := net.Dial("tcp", server.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	if _, err := io.WriteString(conn, rawRequest); err != nil {
+		t.Fatal(err)
+	}
+
+	return conn
+}
+
+func Test_getStreamHandler_stalledUpload(t *testing.T) {
+	appConfig := testConfig(0)
+	appConfig.setCGI = true
+	server, handlerDone := newStreamServer(t, appConfig, "echo started", outputStream)
+
+	// the body is announced, but never sent, the client stays connected
+	conn := dialStalled(t, server, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n")
+
+	select {
+	case <-handlerDone:
+	case <-time.After(3 * time.Second):
+		t.Fatal("handler is stuck on reading the request body after the command has exited")
+	}
+
+	res, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil || string(body) != "started\n" {
+		t.Errorf("got body=%q, err=%v", body, err)
+	}
+}
+
+func Test_getStreamHandler_stalledReaderTimeout(t *testing.T) {
+	for _, mode := range []outputMode{outputStream, outputSSE} {
+		server, handlerDone := newStreamServer(t, testConfig(1), "yes", mode)
+
+		// the client stays connected, but doesn't read the endless output
+		_ = dialStalled(t, server, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+
+		select {
+		case <-handlerDone:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("mode=%d: handler is stuck on writing the output after the command has been killed by timeout", mode)
+		}
 	}
 }
 
