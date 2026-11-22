@@ -6,12 +6,47 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+func Test_setCGIEnv_hidesCredentials(t *testing.T) {
+	for _, withAuth := range []bool{false, true} {
+		appConfig := Config{}
+		if withAuth {
+			appConfig.auth.add("user", "secret")
+		}
+
+		req := httptest.NewRequest("GET", "/", nil)
+		req.SetBasicAuth("user", "secret")
+		req.Header.Set("Proxy-Authorization", "Basic c2VjcmV0")
+		req.Header.Set("Proxy", "http://evil")
+		req.Header.Set("X-Custom", "ok")
+
+		cmd := exec.Command("true")
+		setCGIEnv(cmd, req, appConfig)
+		env := strings.Join(cmd.Env, "\n")
+
+		for _, bad := range []string{"HTTP_AUTHORIZATION=", "HTTP_PROXY_AUTHORIZATION=", "HTTP_PROXY=", "secret", "c2VjcmV0"} {
+			if strings.Contains(env, bad) {
+				t.Errorf("withAuth=%v: env must not contain %q:\n%s", withAuth, bad, env)
+			}
+		}
+		if !strings.Contains(env, "HTTP_X_CUSTOM=ok") {
+			t.Errorf("withAuth=%v: expected HTTP_X_CUSTOM in env:\n%s", withAuth, env)
+		}
+
+		hasUser := strings.Contains(env, "REMOTE_USER=user") && strings.Contains(env, "AUTH_TYPE=Basic")
+		if hasUser != withAuth {
+			t.Errorf("withAuth=%v: REMOTE_USER/AUTH_TYPE presence = %v:\n%s", withAuth, hasUser, env)
+		}
+	}
+}
 
 func Test_parseCGIHeaders(t *testing.T) {
 	data := []struct {

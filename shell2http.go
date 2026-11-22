@@ -404,10 +404,20 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// set HTTP_* variables
 	for headerName, headerValue := range req.Header {
 		envName := strings.ToUpper(strings.Replace(headerName, "-", "_", -1))
-		if envName == "PROXY" {
+		switch envName {
+		case "PROXY": // httpoxy
+			continue
+		case "AUTHORIZATION", "PROXY_AUTHORIZATION": // credentials must not reach scripts (RFC 3875 4.1.18)
 			continue
 		}
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, headerValue[0]))
+	}
+
+	// the request has passed mwBasicAuth, so expose the user name (but never the password)
+	if len(appConfig.auth.users) > 0 {
+		if reqUser, _, ok := req.BasicAuth(); ok {
+			cmd.Env = append(cmd.Env, "AUTH_TYPE=Basic", "REMOTE_USER="+reqUser)
+		}
 	}
 
 	// Host header is moved by net/http from req.Header to req.Host
