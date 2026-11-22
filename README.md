@@ -111,7 +111,7 @@ MacOS:
 
 Download binaries from: [releases](https://github.com/msoap/shell2http/releases/latest) (MacOS/Linux/Windows/RaspberryPi)
 
-For Docker users, availeble tags see in [Docker Hub](https://hub.docker.com/r/msoap/shell2http):
+For Docker users, available tags see in [Docker Hub](https://hub.docker.com/r/msoap/shell2http):
 
     docker pull msoap/shell2http
 
