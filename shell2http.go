@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"html"
@@ -50,6 +51,10 @@ const (
 
 	// readHeaderTimeout - max time for reading request headers
 	readHeaderTimeout = 30 * time.Second
+
+	// waitDelay - with -timeout, how long to wait for the command output to be closed
+	// after the command has exited or has been killed
+	waitDelay = time.Second
 )
 
 // indexTmpl - template for index page
@@ -201,13 +206,19 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		}
 	}
 
-	ctx := req.Context()
+	// the command is not bound to the request context: a client disconnect must not
+	// abort a script halfway, only -timeout limits the execution time
+	var osExecCommand *exec.Cmd
 	if appConfig.timeout > 0 {
-		var cancelFn context.CancelFunc
-		ctx, cancelFn = context.WithTimeout(ctx, time.Duration(appConfig.timeout)*time.Second)
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(appConfig.timeout)*time.Second)
 		defer cancelFn()
+		osExecCommand = exec.CommandContext(ctx, shell, params...) // #nosec
+		setProcessGroup(osExecCommand)
+		// don't wait for processes that escaped the process group and still hold stdout/stderr
+		osExecCommand.WaitDelay = waitDelay
+	} else {
+		osExecCommand = exec.Command(shell, params...) // #nosec
 	}
-	osExecCommand := exec.CommandContext(ctx, shell, params...) // #nosec
 
 	proxySystemEnv(osExecCommand, appConfig)
 
@@ -255,6 +266,12 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		if stderrBuf.Len() > 0 {
 			log.Printf("stderr: %s", stderrBuf.String())
 		}
+	}
+
+	if errors.Is(err, exec.ErrWaitDelay) {
+		// the command exited successfully, but some background process kept its output open
+		log.Printf("command exited, but its output was not closed within %s", waitDelay)
+		err = nil
 	}
 
 	if waitPipeWrite {

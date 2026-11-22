@@ -44,6 +44,7 @@ Usage
         -key=key.pem      : SSL private key path
         -basic-auth=""    : setup HTTP Basic Authentication ("user_name:password"), can be used several times
         -timeout=N        : set timeout for execute shell command (in seconds),
+                            on timeout the shell and all processes it started are killed,
                             also limits reading of the request body, recommended with -one-thread
         -no-log-timestamp : log output without timestamps
         -version
