@@ -458,7 +458,8 @@ func (sc *shellCommand) run(stdout, stderr io.Writer) (int, error) {
 
 	sc.finalizer()
 
-	exitCode := 0
+	// -1 if the command was not started (eg: the shell is not found), the same as for a killed command
+	exitCode := -1
 	if sc.cmd.ProcessState != nil {
 		exitCode = sc.cmd.ProcessState.ExitCode()
 	}

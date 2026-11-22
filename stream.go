@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // maxLineSize - in the SSE mode a longer line without a line break is split into several events
@@ -43,6 +45,14 @@ func getStreamHandler(appConfig Config, shell string, params []string, mode outp
 		}
 
 		rc := http.NewResponseController(rw)
+		if shellCmd.pipeErrCh != nil {
+			// in HTTP/1.x the request body may be closed after the response headers are flushed,
+			// but it is still being written to the command stdin (-cgi)
+			if err := rc.EnableFullDuplex(); err != nil && !errors.Is(err, http.ErrNotSupported) {
+				log.Printf("enable full duplex failed: %s", err)
+			}
+		}
+
 		header := rw.Header()
 		header.Set("Cache-Control", "no-cache")
 		header.Set("X-Accel-Buffering", "no") // don't buffer the response in nginx
@@ -170,11 +180,16 @@ func (lw *lineWriter) Write(data []byte) (int, error) {
 	for {
 		end := bytes.IndexByte(lw.buf, '\n')
 		next := end + 1
-		if end < 0 {
-			if len(lw.buf) < maxLineSize {
-				return len(data), nil
+		if end < 0 && len(lw.buf) < maxLineSize {
+			return len(data), nil
+		}
+		if end < 0 || end > maxLineSize {
+			// split a long line, but not in the middle of an UTF-8 character
+			end = maxLineSize
+			for i := 0; i < utf8.UTFMax-1 && end < len(lw.buf) && !utf8.RuneStart(lw.buf[end]); i++ {
+				end--
 			}
-			end, next = maxLineSize, maxLineSize
+			next = end
 		}
 
 		line := bytes.TrimSuffix(lw.buf[:end], []byte("\r"))

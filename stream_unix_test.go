@@ -233,6 +233,37 @@ func Test_execShellCommand_shutdownKillsCommandWithTimeout(t *testing.T) {
 	}
 }
 
+func Test_getStreamHandler_CGIBody(t *testing.T) {
+	appConfig := testConfig(0)
+	appConfig.setCGI = true
+	server, _ := newStreamServer(t, appConfig, "echo started; wc -c", outputStream)
+
+	// bigger than net/http discards after the response headers are flushed (without full duplex)
+	body := bytes.Repeat([]byte("x"), 1<<20)
+	res, err := http.Post(server.URL, "application/octet-stream", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Fields(string(out))
+	if len(lines) != 2 || lines[1] != strconv.Itoa(len(body)) {
+		t.Errorf("got %q, want the whole body (%d bytes) on stdin", out, len(body))
+	}
+}
+
+func Test_shellCommand_launchFailureExitCode(t *testing.T) {
+	appConfig := testConfig(0)
+	out, exitCode, err := execShellCommand(appConfig, "/nonexistent/shell", nil, httptest.NewRequest("GET", "/", nil), raphanus.New())
+	if err == nil || exitCode != -1 || len(out) != 0 {
+		t.Errorf("got out=%q, exit code=%d, err=%v, want exit code -1 and an error", out, exitCode, err)
+	}
+}
+
 func Test_getStreamHandler_timeout(t *testing.T) {
 	server, _ := newStreamServer(t, testConfig(1), "echo started; sleep 30", outputStream)
 
@@ -266,7 +297,9 @@ func Test_lineWriter(t *testing.T) {
 	}}
 
 	long := bytes.Repeat([]byte("x"), maxLineSize+10)
-	for _, chunk := range [][]byte{[]byte("a\r\nb"), []byte("c\n\n"), long, []byte("tail")} {
+	// a long line with "\n" in the same write, "я" (2 bytes) crosses the size limit
+	longWithNewline := []byte(strings.Repeat("y", maxLineSize-11) + "я" + strings.Repeat("y", 5) + "\n")
+	for _, chunk := range [][]byte{[]byte("a\r\nb"), []byte("c\n\n"), long, longWithNewline, []byte("tail")} {
 		if n, err := lw.Write(chunk); err != nil || n != len(chunk) {
 			t.Fatalf("write: n=%d, err=%v", n, err)
 		}
@@ -275,7 +308,13 @@ func Test_lineWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"a", "bc", "", strings.Repeat("x", maxLineSize), strings.Repeat("x", 10) + "tail"}
+	want := []string{
+		"a", "bc", "",
+		strings.Repeat("x", maxLineSize),
+		strings.Repeat("x", 10) + strings.Repeat("y", maxLineSize-11), // split before "я", not in the middle of it
+		"я" + strings.Repeat("y", 5),
+		"tail",
+	}
 	if len(lines) != len(want) {
 		t.Fatalf("got %d lines, want %d", len(lines), len(want))
 	}
