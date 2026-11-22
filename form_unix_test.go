@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,6 +41,66 @@ func Test_formValue(t *testing.T) {
 			got, gotSet := formValue(tt.values, tt.re)
 			if got != tt.want || gotSet != tt.wantSet {
 				t.Errorf("formValue(%q) = %q, %v, want %q, %v", tt.values, got, gotSet, tt.want, tt.wantSet)
+			}
+		})
+	}
+}
+
+func Test_formVarNames(t *testing.T) {
+	tests := []struct {
+		name string
+		keys []string
+		want []formVar
+	}{
+		{"empty", nil, []formVar{}},
+		{"no collisions", []string{"b", "a-b", "a"}, []formVar{{"a", "a"}, {"b", "b"}, {"a-b", "a_b"}}},
+		{"valid name wins", []string{"a.b", "a_b", "a-b"}, []formVar{{"a_b", "a_b"}}},
+		{"first in sorted order wins", []string{"a.b", "a~b", "a-b"}, []formVar{{"a-b", "a_b"}}},
+		{"non-ASCII names", []string{"ключ", "имя_"}, []formVar{{"имя_", "____"}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			form := map[string][]string{}
+			for _, key := range tt.keys {
+				form[key] = []string{"v"}
+			}
+
+			if got := formVarNames(form); !slices.Equal(got, tt.want) {
+				t.Errorf("formVarNames(%q) = %q, want %q", tt.keys, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_execShellCommand_formVarNameCollision(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"valid name wins", "a-b=dash&a.b=dot&a_b=under", "under\n"},
+		{"first in sorted order wins", "a.b=dot&a-b=dash", "dash\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appConfig := formTestConfig("")
+			shell, params, err := getShellAndParams(`echo "$v_a_b"`, appConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// map iteration order is random, so repeat to make sure the result doesn't depend on it
+			for range 20 {
+				req := httptest.NewRequest("GET", "/?"+tt.query, nil)
+				out, _, err := execShellCommand(appConfig, shell, params, req, raphanus.New())
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if string(out) != tt.want {
+					t.Fatalf("got %q, want %q", out, tt.want)
+				}
 			}
 		})
 	}

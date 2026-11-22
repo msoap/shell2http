@@ -57,6 +57,9 @@ In the `-form` mode, variables are available for shell scripts:
   * $filepath_ID -- uploaded file path, ID - id from `<input type=file name=ID>`, temporary uploaded file will be automatically deleted
   * $filename_ID -- uploaded file name from browser
 
+In variable names all characters except `A-Z`, `a-z`, `0-9` and `_` are replaced with `_`,
+so different parameters can give the same variable (see [Form variable names](#form-variable-names)).
+
 With `-form-check` option you can specify the regular expression for checking the form fields.
 For example, if you want to allow only variables that contain the only digits,
 you can specify the following option: `-form-check='^[0-9]+$'`.
@@ -297,6 +300,21 @@ HTTP method, request body, headers and cookies are not part of the cache key, so
   * output of failed commands is cached too, and a cache hit is always returned with exit code 0 (no 500 error with `-500`, `X-Shell2http-Exit-Code: 0`)
 
 Use `-cache` only for idempotent commands whose output depends on the URI alone.
+
+### Form variable names
+
+In `-form` mode a parameter name becomes a variable name with all characters except `A-Z`, `a-z`, `0-9` and `_`
+replaced with `_` (non-ASCII letters too, one `_` per character). So different parameters can give the same variable:
+`a-b`, `a.b` and `a_b` all become `$v_a_b`, `ключ` and `имя_` both become `$v_____`.
+Only one of them is used, the same one for every request:
+
+  * the parameter whose name is already a valid variable name (`a_b`),
+  * otherwise the first one in sorted (byte) order (`a-b` before `a.b`).
+
+The other parameters are ignored. This is decided before `-form-check`: if the chosen parameter doesn't match the regexp,
+the variable is not set, even when another parameter with the same variable name matches.
+The same rules apply to uploaded files (`$filepath_ID`, `$filename_ID`), and a file that is not used is not saved.
+Use only `A-Z`, `a-z`, `0-9` and `_` in parameter names to avoid this.
 
 ### CGI mode headers
 

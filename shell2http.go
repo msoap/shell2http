@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -9,6 +10,7 @@ import (
 	"html"
 	"io"
 	"log"
+	"maps"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -16,6 +18,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -664,6 +667,41 @@ func formValue(values []string, checkFormRe *regexp.Regexp) (string, bool) {
 	return value, true
 }
 
+// formVar - form key and the name of its variable (without the v_/filepath_/filename_ prefix)
+type formVar struct {
+	key, name string
+}
+
+// formVarNames - variable names for the form keys (non-word characters replaced with "_"), in a fixed order.
+// When several keys give the same name only one of them is used: the key that is already a valid name,
+// otherwise the first one in sorted order ("a-b" over "a.b"), so the same request always sets the same variables.
+func formVarNames[V any](form map[string]V) []formVar {
+	isRenamed := func(key string) int {
+		if unsafeVarNameRe.MatchString(key) {
+			return 1
+		}
+		return 0
+	}
+
+	keys := slices.Collect(maps.Keys(form))
+	slices.SortFunc(keys, func(a, b string) int {
+		return cmp.Or(cmp.Compare(isRenamed(a), isRenamed(b)), cmp.Compare(a, b))
+	})
+
+	result := make([]formVar, 0, len(keys))
+	used := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		name := unsafeVarNameRe.ReplaceAllString(key, "_")
+		if _, ok := used[name]; ok {
+			continue
+		}
+		used[name] = struct{}{}
+		result = append(result, formVar{key: key, name: name})
+	}
+
+	return result
+}
+
 // getForm - parse form into environment vars, also handle uploaded files.
 // On error the command must not be run, the returned finalizer must be called anyway.
 func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func(), error) {
@@ -686,19 +724,19 @@ func getForm(cmd *exec.Cmd, req *http.Request, checkFormRe *regexp.Regexp) (func
 		}
 	}
 
-	for key, values := range req.Form {
-		value, ok := formValue(values, checkFormRe)
+	for _, fv := range formVarNames(req.Form) {
+		value, ok := formValue(req.Form[fv.key], checkFormRe)
 		if !ok {
 			continue
 		}
 
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+unsafeVarNameRe.ReplaceAllString(key, "_"), value))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "v_"+fv.name, value))
 	}
 
 	// handle uploaded files, save all to temporary files and set variables filename_XXX, filepath_XXX
 	if req.MultipartForm != nil {
-		for key, value := range req.MultipartForm.File {
-			key = unsafeVarNameRe.ReplaceAllString(key, "_")
+		for _, fv := range formVarNames(req.MultipartForm.File) {
+			key, value := fv.name, req.MultipartForm.File[fv.key]
 			// a file whose name (raw, from the client) doesn't pass -form-check is skipped entirely
 			if len(value) == 1 && isFormValueAllowed(value[0].Filename, checkFormRe) {
 				var (
