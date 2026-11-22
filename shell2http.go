@@ -371,6 +371,19 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, headerValue[0]))
 	}
 
+	// Host header is moved by net/http from req.Header to req.Host
+	if req.Host != "" {
+		cmd.Env = append(cmd.Env, "HTTP_HOST="+req.Host)
+	}
+
+	// CONTENT_LENGTH and CONTENT_TYPE are set without HTTP_ prefix (RFC 3875)
+	if req.ContentLength > 0 {
+		cmd.Env = append(cmd.Env, "CONTENT_LENGTH="+strconv.FormatInt(req.ContentLength, 10))
+	}
+	if contentType := req.Header.Get("Content-Type"); contentType != "" {
+		cmd.Env = append(cmd.Env, "CONTENT_TYPE="+contentType)
+	}
+
 	remoteHost, remotePort, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		log.Printf("failed to parse remote address %s: %s", req.RemoteAddr, err)
