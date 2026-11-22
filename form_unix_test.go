@@ -113,6 +113,7 @@ func Test_execShellCommand_formCheckFileName(t *testing.T) {
 func Test_getShellHandler_formParseErrorFailsClosed(t *testing.T) {
 	marker := t.TempDir() + "/ran"
 	appConfig := formTestConfig("")
+	appConfig.maxUploadSize = 256
 	shell, params, err := getShellAndParams("touch "+marker+"; echo ran", appConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +129,7 @@ func Test_getShellHandler_formParseErrorFailsClosed(t *testing.T) {
 		{"bad urlencoded", "application/x-www-form-urlencoded", "v=%zz", http.StatusBadRequest},
 		{"bad multipart", "multipart/form-data; boundary=xxx", "not multipart", http.StatusBadRequest},
 		{"body too large", "application/x-www-form-urlencoded", "v=" + strings.Repeat("a", 1024), http.StatusRequestEntityTooLarge},
+		{"upload too large", "multipart/form-data; boundary=xxx", "--xxx\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.txt\"\r\n\r\n" + strings.Repeat("a", 1024) + "\r\n--xxx--\r\n", http.StatusRequestEntityTooLarge},
 	}
 
 	for _, tt := range tests {
@@ -135,9 +137,6 @@ func Test_getShellHandler_formParseErrorFailsClosed(t *testing.T) {
 			req := httptest.NewRequest("POST", "/", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", tt.contentType)
 			rw := httptest.NewRecorder()
-			if tt.wantStatus == http.StatusRequestEntityTooLarge {
-				req.Body = http.MaxBytesReader(rw, req.Body, 16)
-			}
 
 			handler(rw, req)
 

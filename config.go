@@ -69,6 +69,7 @@ type Config struct {
 	includeStderr bool           // also returns output written to stderr (default is stdout only)
 	intServerErr  bool           // return 500 error if shell status code != 0
 	formCheckRe   *regexp.Regexp // regexp for check form fields
+	maxUploadSize int64          // max size of request body parsed by -form (in bytes), 0 - no limit
 }
 
 // getConfig - parse arguments
@@ -147,6 +148,14 @@ func getConfig() (*Config, error) {
 		if err := cfg.auth.Set(os.Getenv(shBasicAuthVar)); err != nil {
 			return nil, err
 		}
+	}
+
+	if maxUploadSize := os.Getenv(shMaxUploadSizeVar); len(maxUploadSize) > 0 {
+		size, err := strconv.ParseInt(maxUploadSize, 10, 64)
+		if err != nil || size < 0 {
+			return nil, fmt.Errorf("%s must be a number of bytes (0 - no limit), got: %q", shMaxUploadSizeVar, maxUploadSize)
+		}
+		cfg.maxUploadSize = size
 	}
 
 	if cfg.shell != "" && cfg.shell != cfg.defaultShell {

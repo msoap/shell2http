@@ -56,6 +56,7 @@ In the "-form" mode, variables are available for shell scripts:
 
 To setup multiple auth users, you can specify the -basic-auth option multiple times.
 The credentials for basic authentication may also be provided via the SH_BASIC_AUTH environment variable.
+The SH_MAX_UPLOAD_SIZE environment variable limits the size (in bytes) of a request body parsed by -form, by default there is no limit.
 You can specify the preferred HTTP-method (via "METHOD:" prefix for path): shell2http GET:/date date
 
 Examples:

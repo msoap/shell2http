@@ -261,6 +261,23 @@ Generate self-signed certificate:
 
     go run $(go env GOROOT)/src/crypto/tls/generate_cert.go -host localhost
 
+Environment variables
+---------------------
+
+shell2http reads these environment variables on start:
+
+| Variable             | Description |
+|----------------------|-------------|
+| `SH_BASIC_AUTH`      | credentials for HTTP Basic Authentication (`user_name:password`), used if `-basic-auth` is not set |
+| `SH_MAX_UPLOAD_SIZE` | max size (in bytes) of a request body parsed by `-form` (query form and uploaded files), a bigger request gets a `413` error and the command is not run. Not set or `0` - no limit (default) |
+
+Example:
+
+    SH_MAX_UPLOAD_SIZE=10485760 shell2http -form POST:/file 'cat $filepath_uplfile > uploaded_file.dat; echo Ok'
+
+Without a limit, uploaded files are saved to the temporary directory (`$TMPDIR`) and can fill the disk,
+set `SH_MAX_UPLOAD_SIZE` if the server is reachable by untrusted clients.
+
 Notes
 -----
 

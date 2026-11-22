@@ -34,6 +34,9 @@ const (
 	// shBasicAuthVar - name of env var for basic auth credentials
 	shBasicAuthVar = "SH_BASIC_AUTH"
 
+	// shMaxUploadSizeVar - name of env var for max size of request body parsed by -form (in bytes), 0 - no limit
+	shMaxUploadSizeVar = "SH_MAX_UPLOAD_SIZE"
+
 	// defaultShellPOSIX - shell executable by default in POSIX systems
 	defaultShellPOSIX = "sh"
 
@@ -148,6 +151,10 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
 	return func(rw http.ResponseWriter, req *http.Request) {
+		if appConfig.setForm && appConfig.maxUploadSize > 0 && isFormData(req.Header) {
+			req.Body = http.MaxBytesReader(rw, req.Body, appConfig.maxUploadSize)
+		}
+
 		shellOut, exitCode, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
 		var formErr *formError
 		if errors.As(err, &formErr) {
