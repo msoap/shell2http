@@ -87,7 +87,7 @@ For Docker users, availeble tags see in [Docker Hub](https://hub.docker.com/r/ms
 
     docker pull msoap/shell2http
 
-Build from source (minimum Go version is 1.12):
+Build from source (minimum Go version is 1.25):
 
     go install github.com/msoap/shell2http@latest
     # set link to your PATH if needed:
