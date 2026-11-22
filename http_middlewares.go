@@ -77,12 +77,13 @@ func mwLogging(handler http.HandlerFunc) http.HandlerFunc {
 		rwLogger := &responseWriterLogger{srcRW: rw}
 		start := time.Now()
 		handler.ServeHTTP(rwLogger, req)
-		reqUser, _, ok := req.BasicAuth()
-		if ok {
-			reqUser += " "
+		// the user name comes from the client (base64-decoded, may contain newlines), quote it
+		userPrefix := ""
+		if reqUser, _, ok := req.BasicAuth(); ok {
+			userPrefix = fmt.Sprintf("%q ", reqUser)
 		}
 		log.Printf(`%s%s %s "%s %s" %d %d "%s" %s`,
-			reqUser,
+			userPrefix,
 			req.Host, remoteAddr,
 			req.Method, req.RequestURI,
 			rwLogger.StatusCode(), rwLogger.Size(),

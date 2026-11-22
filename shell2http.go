@@ -379,7 +379,7 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 			cmd:  "index page",
 			handler: func(rw http.ResponseWriter, req *http.Request) {
 				if req.URL.Path != "/" {
-					log.Printf("%s - 404", req.URL.Path)
+					log.Printf("%q - 404", req.URL.Path)
 					http.NotFound(rw, req)
 					return
 				}
