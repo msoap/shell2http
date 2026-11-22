@@ -253,6 +253,21 @@ Generate self-signed certificate:
 
     go run $(go env GOROOT)/src/crypto/tls/generate_cert.go -host localhost
 
+Notes
+-----
+
+### Caching
+
+With `-cache=N` option the command output is cached by the request URI (path + query string) only, this is by design.
+HTTP method, request body, headers and cookies are not part of the cache key, so within N seconds:
+
+  * requests with the same URI but different methods (`GET:/item` and `DELETE:/item`) get the same cached output, the second command is not run
+  * POST/PUT/PATCH requests with the same URI but different bodies get the output of the first request
+  * in `-cgi` mode, output that depends on headers or cookies (`$HTTP_COOKIE`, `$HTTP_USER_AGENT`, ...) is shared between all clients
+  * output of failed commands is cached too, and a cache hit is always returned with exit code 0 (no 500 error with `-500`, `X-Shell2http-Exit-Code: 0`)
+
+Use `-cache` only for idempotent commands whose output depends on the URI alone.
+
 See also
 --------
 
