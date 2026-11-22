@@ -111,6 +111,8 @@ func getStreamHandler(appConfig Config, shell string, params []string, mode outp
 		default:
 			var stderr io.Writer = stderrLog
 			if appConfig.includeStderr {
+				// the same writer for stdout and stderr: exec.Cmd uses one pipe for both
+				// and writes from one goroutine, so out is not written concurrently
 				stderr = out
 			}
 
