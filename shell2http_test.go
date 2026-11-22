@@ -30,7 +30,7 @@ func Test_setCGIEnv_hidesCredentials(t *testing.T) {
 		req.Header.Set("X-Custom", "ok")
 
 		cmd := exec.Command("true")
-		setCGIEnv(cmd, req, appConfig)
+		setCGIEnv(cmd, req, appConfig, false)
 		env := strings.Join(cmd.Env, "\n")
 
 		for _, bad := range []string{"HTTP_AUTHORIZATION=", "HTTP_PROXY_AUTHORIZATION=", "HTTP_PROXY=", "secret", "c2VjcmV0"} {
@@ -62,7 +62,7 @@ func Test_setCGIEnv_headersAndServer(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), http.LocalAddrContextKey, localAddr))
 
 	cmd := exec.Command("true")
-	setCGIEnv(cmd, req, Config{port: 0})
+	setCGIEnv(cmd, req, Config{port: 0}, false)
 	env := "\n" + strings.Join(cmd.Env, "\n") + "\n"
 
 	for _, want := range []string{
@@ -221,6 +221,31 @@ func Test_getShellAndParams(t *testing.T) {
 	_, _, err = getShellAndParams("ls '-l", Config{shell: "", defaultShell: "sh", defaultShOpt: "-c"})
 	if err == nil {
 		t.Errorf("6. getShellAndParams() failed")
+	}
+
+	for _, cmd := range []string{"", "   "} {
+		if _, _, err = getShellAndParams(cmd, Config{shell: "", defaultShell: "sh", defaultShOpt: "-c"}); err == nil {
+			t.Errorf("7. getShellAndParams(%q) must fail on an empty command", cmd)
+		}
+	}
+}
+
+func Test_proxySystemEnv_exportVars(t *testing.T) {
+	t.Setenv("myLower", "lower-value")
+	t.Setenv("MYUPPER", "upper-value")
+	t.Setenv("NOT_EXPORTED", "secret")
+
+	cmd := exec.Command("true")
+	proxySystemEnv(cmd, Config{exportVars: "myLower, MYUPPER,,"})
+	env := "\n" + strings.Join(cmd.Env, "\n") + "\n"
+
+	for _, want := range []string{"\nmyLower=lower-value\n", "\nMYUPPER=upper-value\n"} {
+		if !strings.Contains(env, want) {
+			t.Errorf("expected %q in env:%s", strings.TrimSpace(want), env)
+		}
+	}
+	if strings.Contains(env, "NOT_EXPORTED") {
+		t.Errorf("NOT_EXPORTED must not be exported:%s", env)
 	}
 }
 

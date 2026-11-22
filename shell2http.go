@@ -33,6 +33,13 @@ var version = "dev"
 // reHeaderName - request headers passed to CGI scripts as HTTP_* variables
 var reHeaderName = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
 
+// regexps for parsing headers from CGI script output
+var (
+	reCGIHeadersEnd = regexp.MustCompile(`\r?\n\r?\n`)
+	reCGIHeaderLine = regexp.MustCompile(`^([^:\s]+):(.*)$`)
+	reCGINewLine    = regexp.MustCompile(`\r?\n`)
+)
+
 const (
 	// defaultPort - default port for http-server
 	defaultPort = 8080
@@ -144,6 +151,9 @@ func getShellAndParams(cmd string, appConfig Config) (shell string, params []str
 		cmdLine, err := shellwords.Parse(cmd)
 		if err != nil {
 			return shell, params, fmt.Errorf("failed to parse %q: %s", cmd, err)
+		}
+		if len(cmdLine) == 0 {
+			return shell, params, fmt.Errorf("the command %q is empty", cmd)
 		}
 
 		shell, params = cmdLine[0], cmdLine[1:]
@@ -281,7 +291,7 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 			}
 		}
 
-		setCGIEnv(osExecCommand, req, appConfig)
+		setCGIEnv(osExecCommand, req, appConfig, writeBody)
 
 		if writeBody {
 			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
@@ -361,7 +371,7 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 		if row.httpMethod != "" {
 			methodDesc = row.httpMethod + ": "
 		}
-		indexLiHTML = append(indexLiHTML, fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s<span></li>`, path, methodDesc, path, html.EscapeString(cmd)))
+		indexLiHTML = append(indexLiHTML, fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s</span></li>`, html.EscapeString(path), methodDesc, html.EscapeString(path), html.EscapeString(cmd)))
 		cmdsForLog[path] = append(cmdsForLog[path], cmd)
 
 		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
@@ -425,8 +435,8 @@ func responseWrite(rw io.Writer, text string) {
 	}
 }
 
-// setCGIEnv - set some CGI variables
-func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
+// setCGIEnv - set some CGI variables, hasBody - the request body is passed to the script stdin
+func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config, hasBody bool) {
 	// set HTTP_* variables
 	for headerName, headerValues := range req.Header {
 		if !reHeaderName.MatchString(headerName) {
@@ -461,8 +471,9 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 		cmd.Env = append(cmd.Env, "HTTP_HOST="+req.Host)
 	}
 
-	// CONTENT_LENGTH and CONTENT_TYPE are set without HTTP_ prefix (RFC 3875)
-	if req.ContentLength > 0 {
+	// CONTENT_LENGTH and CONTENT_TYPE are set without HTTP_ prefix (RFC 3875),
+	// CONTENT_LENGTH is the length of the body on stdin, not set if the body was consumed by -form
+	if hasBody && req.ContentLength > 0 {
 		cmd.Env = append(cmd.Env, "CONTENT_LENGTH="+strconv.FormatInt(req.ContentLength, 10))
 	}
 	if contentType := req.Header.Get("Content-Type"); contentType != "" {
@@ -562,15 +573,13 @@ Header-name2: value2\n
 text
 */
 func parseCGIHeaders(shellOut string) (string, http.Header) {
-	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shellOut, 2)
+	parts := reCGIHeadersEnd.Split(shellOut, 2)
 	if len(parts) == 2 {
-
-		headerRe := regexp.MustCompile(`^([^:\s]+):(.*)$`)
-		headerLines := regexp.MustCompile(`\r?\n`).Split(parts[0], -1)
+		headerLines := reCGINewLine.Split(parts[0], -1)
 		headersMap := http.Header{}
 
 		for _, headerLine := range headerLines {
-			headerParts := headerRe.FindStringSubmatch(headerLine)
+			headerParts := reCGIHeaderLine.FindStringSubmatch(headerLine)
 			if len(headerParts) == 3 {
 				// header names are case-insensitive, a header may be repeated (eg: Set-Cookie), a value may be empty
 				headersMap.Add(headerParts[1], strings.TrimSpace(headerParts[2]))
@@ -816,7 +825,17 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 	}
 
 	if appConfig.exportVars != "" {
-		varsNames = append(varsNames, strings.Split(appConfig.exportVars, ",")...)
+		for _, name := range strings.Split(appConfig.exportVars, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				varsNames = append(varsNames, name)
+			}
+		}
+	}
+
+	// environment names are case-sensitive on POSIX and case-insensitive on Windows
+	sameName := func(a, b string) bool { return a == b }
+	if runtime.GOOS == "windows" {
+		sameName = strings.EqualFold
 	}
 
 	for _, envRaw := range os.Environ() {
@@ -826,8 +845,9 @@ func proxySystemEnv(cmd *exec.Cmd, appConfig Config) {
 				cmd.Env = append(cmd.Env, envRaw)
 			} else {
 				for _, envVarName := range varsNames {
-					if strings.ToUpper(env[0]) == envVarName {
+					if sameName(env[0], envVarName) {
 						cmd.Env = append(cmd.Env, envRaw)
+						break
 					}
 				}
 			}

@@ -44,6 +44,27 @@ func Test_execShellCommand_chunkedBodyContentLength(t *testing.T) {
 	}
 }
 
+func Test_execShellCommand_formBodyNoContentLength(t *testing.T) {
+	appConfig := testConfig(0)
+	appConfig.setCGI = true
+	appConfig.setForm = true
+	shell, params, err := getShellAndParams(`echo "len=[$CONTENT_LENGTH] a=[$v_a]"; cat`, appConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader("a=1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	out, _, err := execShellCommand(appConfig, shell, params, req, raphanus.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != "len=[] a=[1]\n" {
+		t.Errorf("unexpected out: %q", out)
+	}
+}
+
 func Test_getShellHandler_CGIPathAndServer(t *testing.T) {
 	appConfig := testConfig(0)
 	appConfig.setCGI = true
