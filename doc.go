@@ -62,6 +62,16 @@ The credentials for basic authentication may also be provided via the SH_BASIC_A
 The SH_MAX_UPLOAD_SIZE environment variable limits the size (in bytes) of a request body parsed by -form, by default there is no limit.
 You can specify the preferred HTTP-method (via "METHOD:" prefix for path): shell2http GET:/date date
 
+Endpoint options are set as a query string in the path argument: "[METHOD:]/path[?option=1&...]",
+the only allowed value is "1":
+
+  - stream=1 -- send the command output as it is written, without waiting for the command to finish
+  - sse=1 -- the same, but each line of the output is sent as a Server-Sent Event, and an "exit" event at the end
+
+For streaming endpoints the command is killed when the client disconnects or on Ctrl-C/SIGTERM. Example:
+
+	shell2http "/live?stream=1" "tail -F some.log" "/events?sse=1" "tail -F some.log"
+
 Examples:
 
 	shell2http /top "top -l 1 | head -10"

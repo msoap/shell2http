@@ -75,6 +75,31 @@ To setup multiple auth users, you can specify the `-basic-auth` option multiple 
 The credentials for basic authentication may also be provided via the `SH_BASIC_AUTH` environment variable.
 You can specify the preferred HTTP-method (via `METHOD:` prefix for path): `shell2http GET:/date date`
 
+Endpoint options
+----------------
+
+Some settings are set per endpoint, as a query string in the path argument (it is not a part of the URL path):
+
+    [METHOD:]/path[?option=value&option2=value2...]
+
+    shell2http "/live?stream=1" "tail -F some.log"
+    shell2http "GET:/events?sse=1" "tail -F some.log"
+
+| Option     | Description |
+|------------|-------------|
+| `stream=1` | send the command output to the client as it is written, without waiting for the command to finish |
+| `sse=1`    | the same as `stream`, but each line of the output is sent as a [Server-Sent Event](https://html.spec.whatwg.org/multipage/server-sent-events.html) |
+
+  * the only allowed value is `1`, to disable an option just don't set it
+  * an unknown option, a value other than `1` (`/path?sse`, `/path?sse=true`), an empty `?`
+    or `stream` together with `sse` is an error on start
+  * the options are not a part of the path, so `/live?stream=1` and `/live` are the same path (a duplicate),
+    the path still can have different commands for different methods (`GET:/live?sse=1` and `POST:/live`)
+  * without options an endpoint works as usual: the output is sent after the command has finished
+
+Remember to quote the path argument, `?` and `&` are special characters for the shell.
+See [Live output](#live-output-stream-and-sse) for details.
+
 Install
 -------
 
@@ -157,6 +182,26 @@ shell2http -log=/dev/null -cgi / 'echo $REQUEST_URI 1>&2; [ "$REQUEST_METHOD" ==
 
 ```sh
 shell2http -form /slow 'sleep ${v_duration:-1}; echo "sleep ${v_duration:-1} seconds"'
+```
+</details>
+
+<details><summary>Live output of a log file (stream and SSE)</summary>
+
+```sh
+shell2http "/live?stream=1" "tail -F /var/log/system.log" "/events?sse=1" "tail -F /var/log/system.log"
+```
+
+Read the stream with curl (`-N` - don't buffer the output):
+
+    curl -N http://localhost:8080/live
+    curl -N http://localhost:8080/events
+
+Or in a browser with [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource):
+
+```js
+const events = new EventSource("/events");
+events.onmessage = (e) => console.log(e.data);
+events.addEventListener("exit", (e) => { console.log("exit code:", e.data); events.close(); });
 ```
 </details>
 
@@ -337,6 +382,56 @@ shell2http -cgi -form /reflect 'echo "Content-Type: text/plain"; echo; echo "$v_
 ```
 
 The first empty line ends the headers block, everything after it is sent as the body as is.
+
+### Live output (stream and SSE)
+
+With the `stream=1` or `sse=1` [endpoint option](#endpoint-options) the output is sent to the client while the command is running:
+
+  * the response headers are sent at once, with status `200`
+  * `stream=1`: the output is sent as is, as `text/plain; charset=utf-8`;
+    the exit code is sent at the end as the `X-Shell2http-Exit-Code` HTTP trailer
+  * `sse=1`: the output is sent as `text/event-stream`, each line of stdout is a `data:` event (default type `message`),
+    a line longer than 64KB is split into several events. With `-include-stderr` the stderr lines are sent as `stderr` events.
+    When the command has finished, an `exit` event with the exit code is sent:
+
+        data: first line
+
+        event: stderr
+        data: some error
+
+        event: exit
+        data: 0
+
+  * the command (the shell and all processes it started) is killed when the client disconnects,
+    on `-timeout` or on shutdown of shell2http (Unix only, on Windows only the shell process is killed)
+  * a browser `EventSource` reconnects (and runs the command again) when the stream ends,
+    close it on the `exit` event if the command is not endless
+
+Not all options work for streaming endpoints:
+
+  * `-cache` - the output is not cached
+  * `-500` - not applicable, the status is sent before the command has finished
+  * `-show-errors` - not applicable, an exec error is not appended to the output (see the exit code instead)
+  * `-cgi` - CGI variables and the request body on STDIN work as usual, but headers are not parsed from the output
+  * `-one-thread` - an endless stream holds the lock, so all other requests wait for it
+
+Many programs buffer their output when it is not a terminal, so it comes in big chunks with a delay
+(eg: `grep`, `awk`, `sed`, `python`). Use line buffering for them:
+`grep --line-buffered`, `sed -u`, `python -u`, `stdbuf -oL some_command`.
+
+A reverse proxy may buffer the response too: shell2http sends the `X-Accel-Buffering: no` header for nginx,
+for other proxies disable buffering for streaming paths in their settings.
+
+### Shutdown
+
+On `Ctrl-C` (`SIGINT`) or `SIGTERM` shell2http stops accepting new requests, kills running commands
+and waits up to 3 seconds for running requests to finish (a second `Ctrl-C` stops it at once):
+
+  * streaming endpoints and commands with `-timeout` run in their own process group,
+    the shell and all processes it started are killed (on Windows only `Ctrl-C`, and only the shell process is killed)
+  * other commands are in the process group of shell2http: `Ctrl-C` in a terminal reaches them as usual,
+    but on `SIGTERM` (eg: `kill <pid>`) they are not killed and shell2http waits for them up to 3 seconds
+  * background processes of finished commands (`some_command >/dev/null 2>&1 &`) keep running
 
 See also
 --------

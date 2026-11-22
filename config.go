@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -48,28 +49,37 @@ func (au authUsers) isAllow(user, pass string) bool {
 
 // Config - config struct
 type Config struct {
-	port          int            // server port
-	cache         int            // caching command out (in seconds)
-	timeout       int            // timeout for shell command (in seconds)
-	host          string         // server host
-	exportVars    string         // list of environment vars for export to script
-	shell         string         // custom shell
-	defaultShell  string         // shell by default
-	defaultShOpt  string         // shell option for one-liner (-c or /C)
-	cert          string         // SSL certificate
-	key           string         // SSL private key path
-	auth          authUsers      // basic authentication
-	exportAllVars bool           // export all current environment vars
-	setCGI        bool           // set CGI variables
-	setForm       bool           // parse form from URL
-	noIndex       bool           // don't generate index page
-	addExit       bool           // add /exit command
-	oneThread     bool           // run each shell commands in one thread
-	showErrors    bool           // returns the standard output even if the command exits with a non-zero exit code
-	includeStderr bool           // also returns output written to stderr (default is stdout only)
-	intServerErr  bool           // return 500 error if shell status code != 0
-	formCheckRe   *regexp.Regexp // regexp for check form fields
-	maxUploadSize int64          // max size of request body parsed by -form (in bytes), 0 - no limit
+	port          int             // server port
+	cache         int             // caching command out (in seconds)
+	timeout       int             // timeout for shell command (in seconds)
+	host          string          // server host
+	exportVars    string          // list of environment vars for export to script
+	shell         string          // custom shell
+	defaultShell  string          // shell by default
+	defaultShOpt  string          // shell option for one-liner (-c or /C)
+	cert          string          // SSL certificate
+	key           string          // SSL private key path
+	auth          authUsers       // basic authentication
+	exportAllVars bool            // export all current environment vars
+	setCGI        bool            // set CGI variables
+	setForm       bool            // parse form from URL
+	noIndex       bool            // don't generate index page
+	addExit       bool            // add /exit command
+	oneThread     bool            // run each shell commands in one thread
+	showErrors    bool            // returns the standard output even if the command exits with a non-zero exit code
+	includeStderr bool            // also returns output written to stderr (default is stdout only)
+	intServerErr  bool            // return 500 error if shell status code != 0
+	formCheckRe   *regexp.Regexp  // regexp for check form fields
+	maxUploadSize int64           // max size of request body parsed by -form (in bytes), 0 - no limit
+	shutdownCtx   context.Context // canceled on SIGINT/SIGTERM, nil - never
+}
+
+// commandContext - parent context for commands that must be killed when the server is shutting down
+func (cfg Config) commandContext() context.Context {
+	if cfg.shutdownCtx == nil {
+		return context.Background()
+	}
+	return cfg.shutdownCtx
 }
 
 // getConfig - parse arguments

@@ -14,8 +14,10 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"regexp"
 	"runtime"
 	"slices"
@@ -71,7 +73,27 @@ const (
 	// waitDelay - with -timeout, how long to wait for the command output to be closed
 	// after the command has exited or has been killed
 	waitDelay = time.Second
+
+	// shutdownTimeout - on SIGINT/SIGTERM, how long to wait for running requests to finish
+	shutdownTimeout = 3 * time.Second
+
+	// exitCodeHeader - response header (or trailer in the stream mode) with the exit code of the command
+	exitCodeHeader = "X-Shell2http-Exit-Code"
 )
+
+// outputMode - how the command output is sent to the client, set by the endpoint options
+type outputMode int
+
+const (
+	outputBuffered outputMode = iota // wait for the command to finish, then send the whole output (default)
+	outputStream                     // stream=1: send the output as it is written
+	outputSSE                        // sse=1: send each line of the output as a Server-Sent Event
+)
+
+// endpointOptions - settings of one endpoint, set as a query in the path: "/path?stream=1"
+type endpointOptions struct {
+	output outputMode
+}
 
 // indexTmpl - template for index page
 const indexTmpl = `<!DOCTYPE html>
@@ -107,6 +129,7 @@ type command struct {
 	path       string
 	cmd        string
 	httpMethod string
+	options    endpointOptions
 	handler    http.HandlerFunc
 }
 
@@ -122,21 +145,72 @@ func parsePathAndCommands(args []string) ([]command, error) {
 	uniqPaths := map[string]bool{}
 
 	for i := 0; i < len(args); i += 2 {
-		path, cmd := args[i], args[i+1]
-		if uniqPaths[path] {
-			return nil, fmt.Errorf("a duplicate path was detected: %q", path)
-		}
+		rawPath, cmd := args[i], args[i+1]
 
-		pathParts := pathRe.FindStringSubmatch(path)
+		pathParts := pathRe.FindStringSubmatch(rawPath)
 		if len(pathParts) != 3 {
-			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
+			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", rawPath)
 		}
-		cmdHandlers = append(cmdHandlers, command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
 
-		uniqPaths[path] = true
+		path, rawOptions, hasOptions := strings.Cut(pathParts[2], "?")
+		var options endpointOptions
+		if hasOptions {
+			var err error
+			if options, err = parseEndpointOptions(rawOptions); err != nil {
+				return nil, fmt.Errorf("the path %q has invalid options: %s", rawPath, err)
+			}
+		}
+
+		// the same path with different options is a duplicate too
+		pathKey := pathParts[1] + ":" + path
+		if uniqPaths[pathKey] {
+			return nil, fmt.Errorf("a duplicate path was detected: %q", rawPath)
+		}
+		uniqPaths[pathKey] = true
+
+		cmdHandlers = append(cmdHandlers, command{path: path, cmd: cmd, httpMethod: pathParts[1], options: options})
 	}
 
 	return cmdHandlers, nil
+}
+
+// parseEndpointOptions - parse the endpoint options from the query part of the path ("stream=1&..."),
+// the only allowed value is "1"
+func parseEndpointOptions(rawQuery string) (endpointOptions, error) {
+	var options endpointOptions
+
+	query, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return options, err
+	}
+	if len(query) == 0 {
+		return options, fmt.Errorf("no options after \"?\"")
+	}
+
+	outputModes := map[string]outputMode{"stream": outputStream, "sse": outputSSE}
+
+	for _, name := range slices.Sorted(maps.Keys(query)) {
+		mode, ok := outputModes[name]
+		if !ok {
+			return options, fmt.Errorf("unknown option %q, supported: stream, sse", name)
+		}
+
+		values := query[name]
+		if len(values) > 1 {
+			return options, fmt.Errorf("the option %q is set several times", name)
+		}
+
+		if values[0] != "1" {
+			return options, fmt.Errorf("the option %q must be set to 1, got %q", name, values[0])
+		}
+
+		if options.output != outputBuffered {
+			return options, fmt.Errorf("the options stream and sse can't be used together")
+		}
+		options.output = mode
+	}
+
+	return options, nil
 }
 
 // getShellAndParams - get default shell and command
@@ -167,16 +241,10 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
 	return func(rw http.ResponseWriter, req *http.Request) {
-		if appConfig.setForm && appConfig.maxUploadSize > 0 && isFormData(req.Header) {
-			req.Body = http.MaxBytesReader(rw, req.Body, appConfig.maxUploadSize)
-		}
+		limitFormBody(rw, req, appConfig)
 
 		shellOut, exitCode, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
-		var formErr *formError
-		if errors.As(err, &formErr) {
-			// the command was not run, don't show internal details (like temp paths) to the client
-			log.Printf("read request body failed: %s", err)
-			http.Error(rw, http.StatusText(formErr.status), formErr.status)
+		if writeFormError(rw, err) {
 			return
 		}
 		if err != nil {
@@ -217,7 +285,7 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 			}
 		}
 
-		rw.Header().Set("X-Shell2http-Exit-Code", strconv.Itoa(exitCode))
+		rw.Header().Set(exitCodeHeader, strconv.Itoa(exitCode))
 
 		if customStatusCode > 0 {
 			rw.WriteHeader(customStatusCode)
@@ -227,6 +295,26 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 
 		responseWrite(rw, outText)
 	}
+}
+
+// limitFormBody - limit the size of the request body parsed by -form (SH_MAX_UPLOAD_SIZE)
+func limitFormBody(rw http.ResponseWriter, req *http.Request, appConfig Config) {
+	if appConfig.setForm && appConfig.maxUploadSize > 0 && isFormData(req.Header) {
+		req.Body = http.MaxBytesReader(rw, req.Body, appConfig.maxUploadSize)
+	}
+}
+
+// writeFormError - if the command was not run because of the request body, send the error to the client
+func writeFormError(rw http.ResponseWriter, err error) bool {
+	var formErr *formError
+	if !errors.As(err, &formErr) {
+		return false
+	}
+
+	// don't show internal details (like temp paths) to the client
+	log.Printf("read request body failed: %s", err)
+	http.Error(rw, http.StatusText(formErr.status), formErr.status)
+	return true
 }
 
 // execShellCommand - execute shell command, returns bytes out and error
@@ -241,11 +329,55 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	}
 
 	// the command is not bound to the request context: a client disconnect must not
-	// abort a script halfway, only -timeout limits the execution time
-	var osExecCommand *exec.Cmd
+	// abort a script halfway, only -timeout limits the execution time. Without -timeout
+	// the command is in the process group of shell2http and gets Ctrl-C from the terminal,
+	// with -timeout it is in its own process group and is killed on shutdown.
+	ctx := context.Background()
 	if appConfig.timeout > 0 {
-		ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(appConfig.timeout)*time.Second)
+		var cancelFn context.CancelFunc
+		ctx, cancelFn = context.WithTimeout(appConfig.commandContext(), time.Duration(appConfig.timeout)*time.Second)
 		defer cancelFn()
+	}
+
+	shellCmd, err := newShellCommand(ctx, appConfig, shell, params, req)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	stderr := io.Writer(&stderrBuf)
+	if appConfig.includeStderr {
+		stderr = &stdoutBuf
+	}
+
+	exitCode, err := shellCmd.run(&stdoutBuf, stderr)
+	if stderrBuf.Len() > 0 {
+		log.Printf("stderr: %s", stderrBuf.String())
+	}
+	shellOut := stdoutBuf.Bytes()
+
+	if appConfig.cache > 0 {
+		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
+			log.Printf("set to cache failed: %s", cacheErr)
+		}
+	}
+
+	return shellOut, exitCode, err
+}
+
+// shellCommand - a command prepared for the request, see newShellCommand
+type shellCommand struct {
+	cmd       *exec.Cmd
+	finalizer func()     // removes temporary files of the request
+	pipeErrCh chan error // result of writing the request body to the command stdin, nil if the body is not written
+}
+
+// newShellCommand - prepare the command for the request: environment, form variables and uploaded files,
+// CGI variables and the request body on stdin. If ctx can be canceled, the shell and all processes it started
+// are killed when ctx is done. On error the command must not be run.
+func newShellCommand(ctx context.Context, appConfig Config, shell string, params []string, req *http.Request) (*shellCommand, error) {
+	var osExecCommand *exec.Cmd
+	if ctx.Done() != nil {
 		osExecCommand = exec.CommandContext(ctx, shell, params...) // #nosec
 		setProcessGroup(osExecCommand)
 		// don't wait for processes that escaped the process group and still hold stdout/stderr
@@ -256,22 +388,15 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 
 	proxySystemEnv(osExecCommand, appConfig)
 
-	finalizer := func() {}
+	shellCmd := &shellCommand{cmd: osExecCommand, finalizer: func() {}}
 	if appConfig.setForm {
 		var err error
-		if finalizer, err = getForm(osExecCommand, req, appConfig.formCheckRe); err != nil {
+		if shellCmd.finalizer, err = getForm(osExecCommand, req, appConfig.formCheckRe); err != nil {
 			// fail closed: don't run the command with some of the form variables missing
-			finalizer()
-			return nil, 0, err
+			shellCmd.finalizer()
+			return nil, err
 		}
 	}
-
-	var (
-		waitPipeWrite bool
-		pipeErrCh     = make(chan error)
-		shellOut      []byte
-		err           error
-	)
 
 	if appConfig.setCGI {
 		// get request body data data to stdin of script (if not parse form vars above)
@@ -281,11 +406,11 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 			// a chunked body has no length, read it all to set CONTENT_LENGTH (RFC 3875 4.1.2)
 			removeSpool, spoolErr := spoolBody(req)
 			if spoolErr != nil {
-				finalizer()
-				return nil, 0, newFormParseError(spoolErr)
+				shellCmd.finalizer()
+				return nil, newFormParseError(spoolErr)
 			}
-			formFinalizer := finalizer
-			finalizer = func() {
+			formFinalizer := shellCmd.finalizer
+			shellCmd.finalizer = func() {
 				removeSpool()
 				formFinalizer()
 			}
@@ -297,7 +422,8 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
 				log.Println("write request body data to shell failed:", pipeErr)
 			} else {
-				waitPipeWrite = true
+				pipeErrCh := make(chan error, 1)
+				shellCmd.pipeErrCh = pipeErrCh
 				go func() {
 					if _, pipeErr := io.Copy(stdin, req.Body); pipeErr != nil {
 						pipeErrCh <- pipeErr
@@ -309,16 +435,14 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		}
 	}
 
-	if appConfig.includeStderr {
-		shellOut, err = osExecCommand.CombinedOutput()
-	} else {
-		var stderrBuf bytes.Buffer
-		osExecCommand.Stderr = &stderrBuf
-		shellOut, err = osExecCommand.Output()
-		if stderrBuf.Len() > 0 {
-			log.Printf("stderr: %s", stderrBuf.String())
-		}
-	}
+	return shellCmd, nil
+}
+
+// run - run the command with the output to stdout and stderr (may be the same writer),
+// removes temporary files of the request, returns the exit code
+func (sc *shellCommand) run(stdout, stderr io.Writer) (int, error) {
+	sc.cmd.Stdout, sc.cmd.Stderr = stdout, stderr
+	err := sc.cmd.Run()
 
 	if errors.Is(err, exec.ErrWaitDelay) {
 		// the command exited successfully, but some background process kept its output open
@@ -326,26 +450,20 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		err = nil
 	}
 
-	if waitPipeWrite {
-		if pipeErr := <-pipeErrCh; pipeErr != nil {
+	if sc.pipeErrCh != nil {
+		if pipeErr := <-sc.pipeErrCh; pipeErr != nil {
 			log.Println("write request body data to shell failed:", pipeErr)
 		}
 	}
 
-	finalizer()
-
-	if appConfig.cache > 0 {
-		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
-			log.Printf("set to cache failed: %s", cacheErr)
-		}
-	}
+	sc.finalizer()
 
 	exitCode := 0
-	if osExecCommand.ProcessState != nil {
-		exitCode = osExecCommand.ProcessState.ExitCode()
+	if sc.cmd.ProcessState != nil {
+		exitCode = sc.cmd.ProcessState.ExitCode()
 	}
 
-	return shellOut, exitCode, err
+	return exitCode, err
 }
 
 // setupHandlers - setup http handlers
@@ -374,7 +492,14 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 		indexLiHTML = append(indexLiHTML, fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s</span></li>`, html.EscapeString(path), methodDesc, html.EscapeString(path), html.EscapeString(cmd)))
 		cmdsForLog[path] = append(cmdsForLog[path], cmd)
 
-		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
+		var shellHandler http.HandlerFunc
+		if row.options.output == outputBuffered {
+			shellHandler = getShellHandler(appConfig, shell, params, cacheTTL)
+		} else {
+			shellHandler = getStreamHandler(appConfig, shell, params, row.options.output)
+		}
+
+		handler := mwMethodOnly(shellHandler, row.httpMethod)
 		if _, ok := groupedCmd[path]; !ok {
 			groupedCmd[path] = map[string]http.HandlerFunc{}
 		}
@@ -894,6 +1019,10 @@ func main() {
 		cacheTTL = raphanus.New()
 	}
 
+	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), shutdownSignals...)
+	defer stopSignals()
+	appConfig.shutdownCtx = shutdownCtx
+
 	cmdHandlers, err = setupHandlers(cmdHandlers, *appConfig, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
@@ -928,9 +1057,29 @@ func main() {
 		server.ReadTimeout = time.Duration(appConfig.timeout) * time.Second
 	}
 
-	if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
-		log.Fatal(server.ServeTLS(listener, appConfig.cert, appConfig.key))
-	} else {
-		log.Fatal(server.Serve(listener))
+	serveErr := make(chan error, 1)
+	go func() {
+		if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
+			serveErr <- server.ServeTLS(listener, appConfig.cert, appConfig.key)
+		} else {
+			serveErr <- server.Serve(listener)
+		}
+	}()
+
+	select {
+	case err := <-serveErr:
+		log.Fatal(err)
+	case <-shutdownCtx.Done():
+	}
+
+	// a second Ctrl-C stops the server at once
+	stopSignals()
+	log.Printf("shutting down, running commands are stopped")
+
+	// running commands are killed by shutdownCtx, wait for their handlers to send the rest of the response
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("shutdown failed: %s", err)
 	}
 }

@@ -133,6 +133,11 @@ func (rwl *responseWriterLogger) WriteHeader(statusCode int) {
 	rwl.srcRW.WriteHeader(statusCode)
 }
 
+// Unwrap - get the original http.ResponseWriter, used by http.ResponseController (eg: Flush in the stream mode)
+func (rwl *responseWriterLogger) Unwrap() http.ResponseWriter {
+	return rwl.srcRW
+}
+
 func (rwl *responseWriterLogger) StatusCode() int {
 	if rwl.statusCode == 0 {
 		return http.StatusOK
