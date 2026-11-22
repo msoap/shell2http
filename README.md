@@ -28,6 +28,7 @@ Usage
                             - set environment variables with HTTP-request information
                             - write POST|PUT|PATCH-data to script STDIN (if is not set -form or body is not form data)
                             - parse headers from script (eg: "Location: URL\n\n")
+                            - the script must always print its own headers block first (see Notes)
         -export-vars=var  : export environment vars ("VAR1,VAR2,...")
                             by default export PATH, HOME, LANG, USER, TMPDIR
         -export-all-vars  : export all current environment vars
@@ -121,7 +122,7 @@ shell2http -form /form 'echo $v_from, $v_to'
 <details><summary>CGI scripts</summary>
 
 ```sh
-shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+shell2http -cgi /user_agent 'echo "Content-Type: text/plain"; echo; echo "$HTTP_USER_AGENT"'
 shell2http -cgi /set 'touch file; echo "Location: /another_path\n"' # redirect
 shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"' # custom HTTP code
 ```
@@ -292,6 +293,28 @@ HTTP method, request body, headers and cookies are not part of the cache key, so
   * output of failed commands is cached too, and a cache hit is always returned with exit code 0 (no 500 error with `-500`, `X-Shell2http-Exit-Code: 0`)
 
 Use `-cache` only for idempotent commands whose output depends on the URI alone.
+
+### CGI mode headers
+
+In `-cgi` mode the headers block in the script output is optional. Output is treated as headers + body
+when it starts with `Name: value` lines followed by an empty line, otherwise the whole output is the body.
+Printing correct headers is the responsibility of the script:
+
+  * if a script outputs request data (form fields, `$HTTP_*`, `$QUERY_STRING`, `$REQUEST_URI`, STDIN, ...)
+    before its own headers, a client can supply the headers block,
+    eg: `Location`, `Set-Cookie` or `Status` (response header injection)
+  * without a `Content-Type` header, the content type is detected from the output,
+    so request data that starts with an HTML tag is served as `text/html` (XSS)
+
+So a CGI script should always print its own headers block first, at least `Content-Type` and an empty line,
+even when it doesn't need any other headers:
+
+```sh
+# unsafe: shell2http -cgi -form /reflect 'echo "$v_x"'
+shell2http -cgi -form /reflect 'echo "Content-Type: text/plain"; echo; echo "$v_x"'
+```
+
+The first empty line ends the headers block, everything after it is sent as the body as is.
 
 See also
 --------

@@ -27,6 +27,9 @@ Usage:
 		                    - set environment variables with HTTP-request information
 		                    - write POST|PUT|PATCH-data to script STDIN (if not set -form)
 		                    - parse headers from script (eg: "Location: URL\n\n")
+		                    - the script must always print its own headers block first
+		                      (eg: "Content-Type: text/plain\n\n"), otherwise request data
+		                      printed by the script can set response headers
 		-export-vars=var  : export environment vars ("VAR1,VAR2,...")
 		-export-all-vars  : export all current environment vars
 		-no-index         : don't generate index page
@@ -67,7 +70,7 @@ Examples:
 	shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
 	shell2http -form /form 'echo $v_from, $v_to'
-	shell2http -cgi /user_agent 'echo $HTTP_USER_AGENT'
+	shell2http -cgi /user_agent 'echo "Content-Type: text/plain"; echo; echo "$HTTP_USER_AGENT"'
 	shell2http -cgi /set 'touch file; echo "Location: /\n"'
 	shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
 	shell2http -export-vars=GOPATH /get 'echo $GOPATH'
