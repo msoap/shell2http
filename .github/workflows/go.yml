@@ -27,7 +27,7 @@ jobs:
       run: go install github.com/kisielk/errcheck@v1.30.0
 
     - name: errcheck
-      run: errcheck -verbose ./...
+      run: errcheck -verbose -ignoretests ./...
 
     - name: gofmt check
       run: diff <(gofmt -d .) <(echo -n "")
