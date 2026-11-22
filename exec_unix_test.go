@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -69,6 +70,90 @@ func Test_getShellHandler_CGIPathAndServer(t *testing.T) {
 	_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
 	if want := "/sub|/extra/path|127.0.0.1|" + port + "\n"; string(body) != want {
 		t.Errorf("got %q, want %q", body, want)
+	}
+}
+
+func Test_getShellHandler_CGIResponseHeaders(t *testing.T) {
+	data := []struct {
+		name       string
+		cmd        string
+		wantStatus int
+		wantHeader http.Header
+		wantBody   string
+	}{
+		{
+			name:       "Status wins over Location",
+			cmd:        `printf "Status: 301\nLocation: /x\n\n"`,
+			wantStatus: http.StatusMovedPermanently,
+			wantHeader: http.Header{"Location": {"/x"}, "Status": nil},
+		},
+		{
+			name:       "Location without Status",
+			cmd:        `printf "Location: /x\n\n"`,
+			wantStatus: http.StatusFound,
+			wantHeader: http.Header{"Location": {"/x"}},
+		},
+		{
+			name:       "lower case header names",
+			cmd:        `printf "status: 404\ncontent-type: text/plain\n\nnot found\n"`,
+			wantStatus: http.StatusNotFound,
+			wantHeader: http.Header{"Content-Type": {"text/plain"}, "Status": nil},
+			wantBody:   "not found\n",
+		},
+		{
+			name:       "repeated headers",
+			cmd:        `printf "Set-Cookie: a=1\nSet-Cookie: b=2\n\nok\n"`,
+			wantStatus: http.StatusOK,
+			wantHeader: http.Header{"Set-Cookie": {"a=1", "b=2"}},
+			wantBody:   "ok\n",
+		},
+		{
+			name:       "empty header value",
+			cmd:        `printf "X-Empty:\nContent-Type: text/plain\n\nbody\n"`,
+			wantStatus: http.StatusOK,
+			wantHeader: http.Header{"X-Empty": {""}, "Content-Type": {"text/plain"}},
+			wantBody:   "body\n",
+		},
+	}
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+	for _, item := range data {
+		t.Run(item.name, func(t *testing.T) {
+			appConfig := testConfig(0)
+			appConfig.setCGI = true
+			shell, params, err := getShellAndParams(item.cmd, appConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for range 20 { // headers come from a map, repeat to catch an order dependency
+				server := httptest.NewServer(http.HandlerFunc(getShellHandler(appConfig, shell, params, raphanus.New())))
+				res, err := client.Get(server.URL)
+				if err != nil {
+					server.Close()
+					t.Fatal(err)
+				}
+				body, err := io.ReadAll(res.Body)
+				res.Body.Close()
+				server.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if res.StatusCode != item.wantStatus {
+					t.Fatalf("status: got %d, want %d", res.StatusCode, item.wantStatus)
+				}
+				for key, want := range item.wantHeader {
+					if got := res.Header.Values(key); !reflect.DeepEqual(got, want) {
+						t.Fatalf("header %s: got %q, want %q", key, got, want)
+					}
+				}
+				if string(body) != item.wantBody {
+					t.Fatalf("body: got %q, want %q", body, item.wantBody)
+				}
+			}
+		})
 	}
 }
 

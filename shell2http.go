@@ -177,13 +177,12 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 			outText = fmt.Sprintf("%s\nexec error: %s", string(shellOut), err)
 		} else {
 			if appConfig.setCGI {
-				var headers map[string]string
+				var headers http.Header
 				outText, headers = parseCGIHeaders(outText)
 
-				for headerKey, headerValue := range headers {
-					switch headerKey {
-					case "Status":
-						statusParts := reStatusCode.FindAllString(headerValue, -1)
+				for headerKey, headerValues := range headers {
+					if headerKey == "Status" {
+						statusParts := reStatusCode.FindAllString(headerValues[0], -1)
 						if len(statusParts) > 0 {
 							statusCode, err := strconv.Atoi(statusParts[0])
 							if err == nil && statusCode >= minHTTPCode && statusCode < maxHTTPCode {
@@ -191,11 +190,16 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 								continue
 							}
 						}
-					case "Location":
-						customStatusCode = http.StatusFound
 					}
 
-					rw.Header().Set(headerKey, headerValue)
+					for _, headerValue := range headerValues {
+						rw.Header().Add(headerKey, headerValue)
+					}
+				}
+
+				// a redirect without an explicit Status is "302 Found" (RFC 3875 6.2.3), an explicit Status wins
+				if customStatusCode == 0 && headers.Get("Location") != "" {
+					customStatusCode = http.StatusFound
 				}
 			}
 		}
@@ -554,18 +558,19 @@ Header-name2: value2\n
 \n
 text
 */
-func parseCGIHeaders(shellOut string) (string, map[string]string) {
+func parseCGIHeaders(shellOut string) (string, http.Header) {
 	parts := regexp.MustCompile(`\r?\n\r?\n`).Split(shellOut, 2)
 	if len(parts) == 2 {
 
-		headerRe := regexp.MustCompile(`^([^:\s]+):\s*(\S.*)$`)
+		headerRe := regexp.MustCompile(`^([^:\s]+):(.*)$`)
 		headerLines := regexp.MustCompile(`\r?\n`).Split(parts[0], -1)
-		headersMap := map[string]string{}
+		headersMap := http.Header{}
 
 		for _, headerLine := range headerLines {
 			headerParts := headerRe.FindStringSubmatch(headerLine)
 			if len(headerParts) == 3 {
-				headersMap[headerParts[1]] = headerParts[2]
+				// header names are case-insensitive, a header may be repeated (eg: Set-Cookie), a value may be empty
+				headersMap.Add(headerParts[1], strings.TrimSpace(headerParts[2]))
 			} else {
 				// headers is not valid, return all text
 				return shellOut, nil

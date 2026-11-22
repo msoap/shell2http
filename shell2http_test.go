@@ -115,7 +115,7 @@ func Test_parseCGIHeaders(t *testing.T) {
 	data := []struct {
 		in      string
 		out     string
-		headers map[string]string
+		headers http.Header
 	}{
 		{
 			in:      "Some text",
@@ -125,17 +125,32 @@ func Test_parseCGIHeaders(t *testing.T) {
 		{
 			in:      "Location: url\n\nSome text",
 			out:     "Some text",
-			headers: map[string]string{"Location": "url"},
+			headers: http.Header{"Location": {"url"}},
 		},
 		{
 			in:      "Location: url\n\n",
 			out:     "",
-			headers: map[string]string{"Location": "url"},
+			headers: http.Header{"Location": {"url"}},
 		},
 		{
 			in:      "Location: url\nX-Name:  x-value\n\nSome text",
 			out:     "Some text",
-			headers: map[string]string{"Location": "url", "X-Name": "x-value"},
+			headers: http.Header{"Location": {"url"}, "X-Name": {"x-value"}},
+		},
+		{
+			in:      "status: 404\ncontent-type: text/plain\n\nnot found",
+			out:     "not found",
+			headers: http.Header{"Status": {"404"}, "Content-Type": {"text/plain"}},
+		},
+		{
+			in:      "Set-Cookie: a=1\nSet-Cookie: b=2\n\nok",
+			out:     "ok",
+			headers: http.Header{"Set-Cookie": {"a=1", "b=2"}},
+		},
+		{
+			in:      "X-Empty:\nContent-Type: text/plain\n\nbody",
+			out:     "body",
+			headers: http.Header{"X-Empty": {""}, "Content-Type": {"text/plain"}},
 		},
 		{
 			in:      "Some text\nText\n\ntext",
@@ -150,27 +165,27 @@ func Test_parseCGIHeaders(t *testing.T) {
 		{
 			in:      "Text::::\n\ntext",
 			out:     "text",
-			headers: map[string]string{"Text": ":::"},
+			headers: http.Header{"Text": {":::"}},
 		},
 		{
 			in:      "Text:     :::\n\ntext",
 			out:     "text",
-			headers: map[string]string{"Text": ":::"},
+			headers: http.Header{"Text": {":::"}},
 		},
 		{
 			in:      "Text:     \n\ntext",
-			out:     "Text:     \n\ntext",
-			headers: nil,
+			out:     "text",
+			headers: http.Header{"Text": {""}},
 		},
 		{
 			in:      "Header: value\nText:     \n\ntext",
-			out:     "Header: value\nText:     \n\ntext",
-			headers: nil,
+			out:     "text",
+			headers: http.Header{"Header": {"value"}, "Text": {""}},
 		},
 		{
 			in:      "Location: url\r\nX-Name:  x-value\r\n\r\nOn Windows",
 			out:     "On Windows",
-			headers: map[string]string{"Location": "url", "X-Name": "x-value"},
+			headers: http.Header{"Location": {"url"}, "X-Name": {"x-value"}},
 		},
 	}
 
