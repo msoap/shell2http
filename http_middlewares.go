@@ -106,8 +106,8 @@ func mwOneThread(handler http.HandlerFunc) http.HandlerFunc {
 
 	return func(rw http.ResponseWriter, req *http.Request) {
 		mutex.Lock()
+		defer mutex.Unlock()
 		handler.ServeHTTP(rw, req)
-		mutex.Unlock()
 	}
 }
 

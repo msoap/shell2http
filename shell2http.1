@@ -33,7 +33,8 @@ options:
     \-cert=cert\.pem    : SSL certificate path (if specified \-cert/\-key options \- run https server)
     \-key=key\.pem      : SSL private key path
     \-basic\-auth=""    : setup HTTP Basic Authentication ("user_name:password"), can be used several times
-    \-timeout=N        : set timeout for execute shell command (in seconds)
+    \-timeout=N        : set timeout for execute shell command (in seconds),
+                        also limits reading of the request body, recommended with \-one\-thread
     \-no\-log\-timestamp : log output without timestamps
     \-version
     \-help

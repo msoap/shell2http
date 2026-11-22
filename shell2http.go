@@ -42,8 +42,14 @@ const (
 	// defaultShellPlan9 - shell executable by default in Plan9
 	defaultShellPlan9 = "rc"
 
+	// minHTTPCode, maxHTTPCode - range of status codes accepted from the CGI "Status" header,
+	// http.ResponseWriter.WriteHeader panics on codes outside of [100, 999]
+	minHTTPCode            = 100
 	maxHTTPCode            = 1000
 	maxMemoryForUploadFile = 65536
+
+	// readHeaderTimeout - max time for reading request headers
+	readHeaderTimeout = 30 * time.Second
 )
 
 // indexTmpl - template for index page
@@ -158,7 +164,7 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 						statusParts := reStatusCode.FindAllString(headerValue, -1)
 						if len(statusParts) > 0 {
 							statusCode, err := strconv.Atoi(statusParts[0])
-							if err == nil && statusCode > 0 && statusCode < maxHTTPCode {
+							if err == nil && statusCode >= minHTTPCode && statusCode < maxHTTPCode {
 								customStatusCode = statusCode
 								continue
 							}
@@ -651,9 +657,18 @@ func main() {
 
 	log.Printf("listen %s\n", appConfig.readableURL(listener.Addr()))
 
+	server := &http.Server{
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
+	if appConfig.timeout > 0 {
+		// the whole request, including the body, must be read within the command timeout,
+		// so a stalled body cannot hold the handler (and the -one-thread lock) forever
+		server.ReadTimeout = time.Duration(appConfig.timeout) * time.Second
+	}
+
 	if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
-		log.Fatal(http.ServeTLS(listener, nil, appConfig.cert, appConfig.key))
+		log.Fatal(server.ServeTLS(listener, appConfig.cert, appConfig.key))
 	} else {
-		log.Fatal(http.Serve(listener, nil))
+		log.Fatal(server.Serve(listener))
 	}
 }
