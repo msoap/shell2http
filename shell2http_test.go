@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -44,6 +45,68 @@ func Test_setCGIEnv_hidesCredentials(t *testing.T) {
 		hasUser := strings.Contains(env, "REMOTE_USER=user") && strings.Contains(env, "AUTH_TYPE=Basic")
 		if hasUser != withAuth {
 			t.Errorf("withAuth=%v: REMOTE_USER/AUTH_TYPE presence = %v:\n%s", withAuth, hasUser, env)
+		}
+	}
+}
+
+func Test_setCGIEnv_headersAndServer(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://example.com:8080/env?q=1", nil)
+	req.Header.Add("X-Multi", "one")
+	req.Header.Add("X-Multi", "two")
+	req.Header.Add("Cookie", "a=1")
+	req.Header.Add("Cookie", "b=2")
+	req.Header["X-Foo_bar"] = []string{"underscore"}
+	req.Header["X-Foo-Bar"] = []string{"dash"}
+	req.Header["Weird.Name$x"] = []string{"v"}
+	localAddr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 34567}
+	req = req.WithContext(context.WithValue(req.Context(), http.LocalAddrContextKey, localAddr))
+
+	cmd := exec.Command("true")
+	setCGIEnv(cmd, req, Config{port: 0})
+	env := "\n" + strings.Join(cmd.Env, "\n") + "\n"
+
+	for _, want := range []string{
+		"HTTP_X_MULTI=one, two",
+		"HTTP_COOKIE=a=1; b=2",
+		"HTTP_X_FOO_BAR=dash",
+		"GATEWAY_INTERFACE=CGI/1.1",
+		"REMOTE_HOST=192.0.2.1",
+		"SERVER_NAME=example.com",
+		"SERVER_PORT=34567",
+		"SCRIPT_NAME=/env",
+		"PATH_INFO=",
+	} {
+		if !strings.Contains(env, "\n"+want+"\n") {
+			t.Errorf("expected %q in env:%s", want, env)
+		}
+	}
+	for _, bad := range []string{"underscore", "WEIRD", "HTTPS="} {
+		if strings.Contains(env, bad) {
+			t.Errorf("env must not contain %q:%s", bad, env)
+		}
+	}
+}
+
+func Test_splitScriptPath(t *testing.T) {
+	tests := []struct {
+		pattern, path, scriptName, pathInfo string
+	}{
+		{"", "/env", "/env", ""},
+		{"/env", "/env", "/env", ""},
+		{"/sub/", "/sub/extra/path", "/sub", "/extra/path"},
+		{"/sub/", "/sub/", "/sub", "/"},
+		{"/", "/any/path", "", "/any/path"},
+		{"/", "/", "", "/"},
+		{"/a/b/", "/a/b/c", "/a/b", "/c"},
+		{"/user/{id}/", "/user/42/x", "/user/42", "/x"},
+		{"/files/{path...}", "/files/a/b", "/files", "/a/b"},
+		{"/sub/{$}", "/sub/", "/sub/", ""},
+	}
+
+	for _, tt := range tests {
+		scriptName, pathInfo := splitScriptPath(tt.pattern, tt.path)
+		if scriptName != tt.scriptName || pathInfo != tt.pathInfo {
+			t.Errorf("splitScriptPath(%q, %q) = %q, %q, want %q, %q", tt.pattern, tt.path, scriptName, pathInfo, tt.scriptName, tt.pathInfo)
 		}
 	}
 }

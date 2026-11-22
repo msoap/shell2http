@@ -4,6 +4,9 @@ package main
 
 import (
 	"context"
+	"io"
+	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -18,6 +21,55 @@ import (
 
 func testConfig(timeout int) Config {
 	return Config{timeout: timeout, defaultShell: "sh", defaultShOpt: "-c", shell: "sh"}
+}
+
+func Test_execShellCommand_chunkedBodyContentLength(t *testing.T) {
+	appConfig := testConfig(0)
+	appConfig.setCGI = true
+	shell, params, err := getShellAndParams(`echo "len=$CONTENT_LENGTH"; cat`, appConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader("chunked body"))
+	req.ContentLength = -1 // as for "Transfer-Encoding: chunked"
+
+	out, _, err := execShellCommand(appConfig, shell, params, req, raphanus.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != "len=12\nchunked body" {
+		t.Errorf("unexpected out: %q", out)
+	}
+}
+
+func Test_getShellHandler_CGIPathAndServer(t *testing.T) {
+	appConfig := testConfig(0)
+	appConfig.setCGI = true
+	shell, params, err := getShellAndParams(`echo "Content-Type: text/plain"; echo; echo "$SCRIPT_NAME|$PATH_INFO|$SERVER_NAME|$SERVER_PORT"`, appConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sub/", getShellHandler(appConfig, shell, params, raphanus.New()))
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	res, err := http.Get(server.URL + "/sub/extra/path")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
+	if want := "/sub|/extra/path|127.0.0.1|" + port + "\n"; string(body) != want {
+		t.Errorf("got %q, want %q", body, want)
+	}
 }
 
 func Test_execShellCommand_timeoutKillsProcessGroup(t *testing.T) {

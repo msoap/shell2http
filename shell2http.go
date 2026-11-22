@@ -27,6 +27,9 @@ import (
 
 var version = "dev"
 
+// reHeaderName - request headers passed to CGI scripts as HTTP_* variables
+var reHeaderName = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
+
 const (
 	// defaultPort - default port for http-server
 	defaultPort = 8080
@@ -159,7 +162,7 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 		var formErr *formError
 		if errors.As(err, &formErr) {
 			// the command was not run, don't show internal details (like temp paths) to the client
-			log.Printf("parse form failed: %s", err)
+			log.Printf("read request body failed: %s", err)
 			http.Error(rw, http.StatusText(formErr.status), formErr.status)
 			return
 		}
@@ -254,10 +257,26 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	)
 
 	if appConfig.setCGI {
+		// get request body data data to stdin of script (if not parse form vars above)
+		writeBody := (req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") && (!appConfig.setForm || !isFormData(req.Header))
+
+		if writeBody && req.ContentLength < 0 {
+			// a chunked body has no length, read it all to set CONTENT_LENGTH (RFC 3875 4.1.2)
+			removeSpool, spoolErr := spoolBody(req)
+			if spoolErr != nil {
+				finalizer()
+				return nil, 0, newFormParseError(spoolErr)
+			}
+			formFinalizer := finalizer
+			finalizer = func() {
+				removeSpool()
+				formFinalizer()
+			}
+		}
+
 		setCGIEnv(osExecCommand, req, appConfig)
 
-		// get request body data data to stdin of script (if not parse form vars above)
-		if (req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") && (!appConfig.setForm || !isFormData(req.Header)) {
+		if writeBody {
 			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
 				log.Println("write request body data to shell failed:", pipeErr)
 			} else {
@@ -402,15 +421,25 @@ func responseWrite(rw io.Writer, text string) {
 // setCGIEnv - set some CGI variables
 func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	// set HTTP_* variables
-	for headerName, headerValue := range req.Header {
-		envName := strings.ToUpper(strings.Replace(headerName, "-", "_", -1))
+	for headerName, headerValues := range req.Header {
+		if !reHeaderName.MatchString(headerName) {
+			// "X-Foo_Bar" would collide with "X-Foo-Bar" and could spoof a header set by a proxy,
+			// other characters don't give a valid variable name (the same rule as in Apache httpd)
+			continue
+		}
+		envName := strings.ToUpper(strings.ReplaceAll(headerName, "-", "_"))
 		switch envName {
 		case "PROXY": // httpoxy
 			continue
 		case "AUTHORIZATION", "PROXY_AUTHORIZATION": // credentials must not reach scripts (RFC 3875 4.1.18)
 			continue
 		}
-		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, headerValue[0]))
+		// repeated headers are joined into one value (RFC 3875 4.1.18), cookies use their own separator (RFC 6265 5.4)
+		separator := ", "
+		if envName == "COOKIE" {
+			separator = "; "
+		}
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_%s=%s", envName, strings.Join(headerValues, separator)))
 	}
 
 	// the request has passed mwBasicAuth, so expose the user name (but never the password)
@@ -433,22 +462,31 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 		cmd.Env = append(cmd.Env, "CONTENT_TYPE="+contentType)
 	}
 
+	if req.TLS != nil {
+		cmd.Env = append(cmd.Env, "HTTPS=on")
+	}
+
 	remoteHost, remotePort, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		log.Printf("failed to parse remote address %s: %s", req.RemoteAddr, err)
+		log.Printf("failed to parse remote address %q: %s", req.RemoteAddr, err)
 	}
+	serverName, serverPort := getServerNameAndPort(req, appConfig)
+	scriptName, pathInfo := splitScriptPath(req.Pattern, req.URL.Path)
+
 	CGIVars := [...]struct {
 		cgiName, value string
 	}{
-		{"PATH_INFO", req.URL.Path},
+		{"GATEWAY_INTERFACE", "CGI/1.1"},
+		{"PATH_INFO", pathInfo},
 		{"QUERY_STRING", req.URL.RawQuery},
 		{"REMOTE_ADDR", remoteHost},
+		{"REMOTE_HOST", remoteHost}, // without DNS lookup it is the same as REMOTE_ADDR (RFC 3875 4.1.9)
 		{"REMOTE_PORT", remotePort},
 		{"REQUEST_METHOD", req.Method},
 		{"REQUEST_URI", req.RequestURI},
-		{"SCRIPT_NAME", req.URL.Path},
-		{"SERVER_NAME", appConfig.host},
-		{"SERVER_PORT", strconv.Itoa(appConfig.port)},
+		{"SCRIPT_NAME", scriptName},
+		{"SERVER_NAME", serverName},
+		{"SERVER_PORT", serverPort},
 		{"SERVER_PROTOCOL", req.Proto},
 		{"SERVER_SOFTWARE", "shell2http"},
 	}
@@ -456,6 +494,56 @@ func setCGIEnv(cmd *exec.Cmd, req *http.Request, appConfig Config) {
 	for _, row := range CGIVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", row.cgiName, row.value))
 	}
+}
+
+// getServerNameAndPort - get SERVER_NAME from the Host header and SERVER_PORT from the accepted connection,
+// -host/-port are only a fallback (-host may be empty and -port may be 0)
+func getServerNameAndPort(req *http.Request, appConfig Config) (string, string) {
+	serverName, serverPort := appConfig.host, strconv.Itoa(appConfig.port)
+
+	if localAddr, ok := req.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		if host, port, err := net.SplitHostPort(localAddr.String()); err == nil {
+			serverName, serverPort = host, port
+		}
+	}
+
+	if req.Host != "" {
+		if host, _, err := net.SplitHostPort(req.Host); err == nil {
+			serverName = host
+		} else {
+			serverName = strings.TrimSuffix(strings.TrimPrefix(req.Host, "["), "]")
+		}
+	}
+
+	return serverName, serverPort
+}
+
+// splitScriptPath - split the request path into SCRIPT_NAME (the part matched by the handler pattern)
+// and PATH_INFO (the rest), like Apache httpd and net/http/cgi:
+//
+//	pattern "/env", path "/env"             -> "/env", ""
+//	pattern "/sub/", path "/sub/extra/path" -> "/sub", "/extra/path"
+//	pattern "/", path "/any/path"           -> "", "/any/path"
+func splitScriptPath(pattern, urlPath string) (scriptName, pathInfo string) {
+	switch {
+	case strings.HasSuffix(pattern, "...}"): // "/files/{path...}" is the same subtree as "/files/"
+		pattern = pattern[:strings.LastIndex(pattern, "{")]
+	case pattern == "" || !strings.HasSuffix(pattern, "/"): // an exact pattern (or "/path/{$}")
+		return urlPath, ""
+	}
+
+	// the script owns as many leading path segments as there are in the pattern
+	segments := strings.Count(strings.TrimSuffix(pattern, "/"), "/")
+	end := 0
+	for range segments {
+		next := strings.IndexByte(urlPath[end+1:], '/')
+		if next < 0 {
+			return urlPath, ""
+		}
+		end += next + 1
+	}
+
+	return urlPath[:end], urlPath[end:]
 }
 
 /*
@@ -514,6 +602,35 @@ func newFormParseError(err error) error {
 	}
 
 	return &formError{status: http.StatusBadRequest, err: err}
+}
+
+// spoolBody - read a request body of unknown length into a temp file, then the body is read from that file
+// and req.ContentLength is set, the returned function removes the file
+func spoolBody(req *http.Request) (func(), error) {
+	spool, err := os.CreateTemp("", "shell2http-body-")
+	if err != nil {
+		return func() {}, err
+	}
+	remove := func() {
+		if err := spool.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			log.Printf("close temp file failed: %s", err)
+		}
+		if err := os.Remove(spool.Name()); err != nil {
+			log.Printf("remove temp file failed: %s", err)
+		}
+	}
+
+	size, err := io.Copy(spool, req.Body)
+	if err == nil {
+		_, err = spool.Seek(0, io.SeekStart)
+	}
+	if err != nil {
+		remove()
+		return func() {}, err
+	}
+
+	req.Body, req.ContentLength = spool, size
+	return remove, nil
 }
 
 // isFormValueAllowed - check a value with the -form-check regexp, without the regexp all values are allowed
