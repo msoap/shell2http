@@ -265,7 +265,10 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		}
 	}
 
-	exitCode := osExecCommand.ProcessState.ExitCode()
+	exitCode := 0
+	if osExecCommand.ProcessState != nil {
+		exitCode = osExecCommand.ProcessState.ExitCode()
+	}
 
 	return shellOut, exitCode, err
 }
