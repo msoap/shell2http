@@ -69,7 +69,7 @@ Examples:
 	shell2http -export-all-vars /env 'printenv | sort' /env/path 'echo $PATH' /env/gopath 'echo $GOPATH'
 	shell2http -export-all-vars /shell_vars_json 'perl -MJSON -E "say to_json(\%ENV)"'
 	shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br><pre>$(cal $(date +%Y))</pre></body></html>"'
-	shell2http -form /form 'echo $v_from, $v_to'
+	shell2http -form /form 'echo "$v_from, $v_to"'
 	shell2http -cgi /user_agent 'echo "Content-Type: text/plain"; echo; echo "$HTTP_USER_AGENT"'
 	shell2http -cgi /set 'touch file; echo "Location: /\n"'
 	shell2http -cgi /404 'echo "Status: 404"; echo; echo "404 page"'
@@ -102,7 +102,7 @@ Proxy with cache in files (for debug with production API with rate limit)
 	shell2http \
 		-form \
 		/form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
-		/get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
+		/get 'MD5=$(printf "%s" "$v_url" | md5); cat cache_$MD5 || (curl -sL --proto "=http,https" -- "$v_url" | tee cache_$MD5)'
 
 Remote sound volume control (Mac OS)
 

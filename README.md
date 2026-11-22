@@ -115,7 +115,7 @@ shell2http /cal_html 'echo "<html><body><h1>Calendar</h1>Date: <b>$(date)</b><br
 <details><summary>Using URL parameters (http://localhost:8080/form?from=10&to=100)</summary>
 
 ```sh
-shell2http -form /form 'echo $v_from, $v_to'
+shell2http -form /form 'echo "$v_from, $v_to"'
 ```
 </details>
 
@@ -176,7 +176,7 @@ get `http://api.url/` as `http://localhost:8080/get?url=http://api.url/`
 ```sh
 shell2http -form \
     /form 'echo "<html><form action=/get>URL: <input name=url><input type=submit>"' \
-    /get 'MD5=$(printf "%s" $v_url | md5); cat cache_$MD5 || (curl -sL $v_url | tee cache_$MD5)'
+    /get 'MD5=$(printf "%s" "$v_url" | md5); cat cache_$MD5 || (curl -sL --proto "=http,https" -- "$v_url" | tee cache_$MD5)'
 ```
 </details>
 
@@ -210,8 +210,12 @@ shell2http -cgi /call1 'cat 1.json' /call2 'echo "Content-Type: application/json
 Returns value of `var` for run in Windows `cmd` (`http://localhost:8080/test?var=value123`)
 
 ```sh
-shell2http.exe -form /test "echo %v_var%"
+shell2http.exe -form -form-check="^[0-9A-Za-z_]+$" /test "echo %v_var%"
 ```
+
+`cmd` expands `%v_var%` before it parses the command line, so characters like `&` or `|`
+in the value run as commands (`?var=x%26calc` runs `calc`). Quoting does not help,
+so on Windows always limit the values with `-form-check`.
 </details>
 
 <details><summary>With HTTP headers</summary>
