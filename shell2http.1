@@ -646,7 +646,7 @@ A reverse proxy may buffer the response too: shell2http sends the \fBX\-Accel\-B
 With the \fBwebsocket=1\fR \fIendpoint option\fR the command is started when a client opens a WebSocket (\fBnew WebSocket("ws://host:8080/path")\fR in a browser), and works while the connection is open:
 .
 .IP "\(bu" 4
-each message from the client (text or binary) is written to STDIN of the command with \fB\en\fR appended, so \fBread line\fR in a script gets one message; a message bigger than 64KB closes the connection
+each message from the client (text or binary) is written to STDIN of the command with \fB\en\fR appended, so \fBread line\fR in a script gets one message; a message bigger than 64KB closes the connection\. If the command doesn\'t read STDIN, and more than 64 messages are waiting (in addition to the 64KB pipe buffer), the command is stopped
 .
 .IP "\(bu" 4
 each line of stdout is sent as a message (without \fB\en\fR, \fB\er\en\fR), a line longer than 64KB is split into several messages, a line that is not valid UTF\-8 is sent as a binary message\. With \fB\-include\-stderr\fR the stderr lines are sent too
@@ -658,7 +658,7 @@ when the command has finished, the connection is closed with the code \fB1000\fR
 the command (the shell and all processes it started) is killed when the client closes the connection, on \fB\-timeout\fR or on shutdown of shell2http, like for \fIstreaming endpoints\fR
 .
 .IP "\(bu" 4
-the path accepts only WebSocket handshakes (\fBGET\fR), a plain request gets \fB400\fR
+the path accepts only WebSocket handshakes (\fBGET\fR without a body), a plain request gets \fB400\fR
 .
 .IP "\(bu" 4
 \fB\-form\fR, \fB\-cgi\fR (variables only, there is no request body) and \fB\-basic\-auth\fR work as usual, the options not working for streaming endpoints don\'t work here either
