@@ -14,13 +14,16 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mattn/go-shellwords"
@@ -71,7 +74,36 @@ const (
 	// waitDelay - with -timeout, how long to wait for the command output to be closed
 	// after the command has exited or has been killed
 	waitDelay = time.Second
+
+	// shutdownTimeout - on SIGINT/SIGTERM, how long to wait for running requests to finish
+	shutdownTimeout = 3 * time.Second
+
+	// exitCodeHeader - response header (or trailer in the stream mode) with the exit code of the command
+	exitCodeHeader = "X-Shell2http-Exit-Code"
 )
+
+// outputMode - how the command output is sent to the client, set by the endpoint options
+type outputMode int
+
+const (
+	outputBuffered  outputMode = iota // wait for the command to finish, then send the whole output (default)
+	outputStream                      // stream=1: send the output as it is written
+	outputSSE                         // sse=1: send each line of the output as a Server-Sent Event
+	outputWebSocket                   // websocket=1: messages from the client to stdin, each line of the output as a message
+)
+
+// allowOrigin* - special values of the allow-origin option, any other value is a list of origins
+const (
+	allowOriginSameOrigin = "same-origin" // the Origin host is the same as the Host header (default)
+	allowOriginSameSite   = "same-site"   // the Origin host has the same registrable domain as the Host header
+	allowOriginAll        = "*"           // any origin
+)
+
+// endpointOptions - settings of one endpoint, set as a query in the path: "/path?stream=1"
+type endpointOptions struct {
+	output      outputMode
+	allowOrigin string // allow-origin: the origins allowed to open a WebSocket, "" - same-origin
+}
 
 // indexTmpl - template for index page
 const indexTmpl = `<!DOCTYPE html>
@@ -107,6 +139,7 @@ type command struct {
 	path       string
 	cmd        string
 	httpMethod string
+	options    endpointOptions
 	handler    http.HandlerFunc
 }
 
@@ -122,21 +155,89 @@ func parsePathAndCommands(args []string) ([]command, error) {
 	uniqPaths := map[string]bool{}
 
 	for i := 0; i < len(args); i += 2 {
-		path, cmd := args[i], args[i+1]
-		if uniqPaths[path] {
-			return nil, fmt.Errorf("a duplicate path was detected: %q", path)
-		}
+		rawPath, cmd := args[i], args[i+1]
 
-		pathParts := pathRe.FindStringSubmatch(path)
+		pathParts := pathRe.FindStringSubmatch(rawPath)
 		if len(pathParts) != 3 {
-			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", path)
+			return nil, fmt.Errorf("the path %q must begin with the prefix /, and with optional METHOD: prefix", rawPath)
 		}
-		cmdHandlers = append(cmdHandlers, command{path: pathParts[2], cmd: cmd, httpMethod: pathParts[1]})
 
-		uniqPaths[path] = true
+		path, rawOptions, hasOptions := strings.Cut(pathParts[2], "?")
+		var options endpointOptions
+		if hasOptions {
+			var err error
+			if options, err = parseEndpointOptions(rawOptions); err != nil {
+				return nil, fmt.Errorf("the path %q has invalid options: %s", rawPath, err)
+			}
+		}
+
+		// the WebSocket handshake is always a GET request
+		if options.output == outputWebSocket && pathParts[1] != "" && pathParts[1] != http.MethodGet {
+			return nil, fmt.Errorf("the path %q has invalid options: websocket works only with the GET method", rawPath)
+		}
+
+		// the same path with different options is a duplicate too
+		pathKey := pathParts[1] + ":" + path
+		if uniqPaths[pathKey] {
+			return nil, fmt.Errorf("a duplicate path was detected: %q", rawPath)
+		}
+		uniqPaths[pathKey] = true
+
+		cmdHandlers = append(cmdHandlers, command{path: path, cmd: cmd, httpMethod: pathParts[1], options: options})
 	}
 
 	return cmdHandlers, nil
+}
+
+// parseEndpointOptions - parse the endpoint options from the query part of the path ("stream=1&..."),
+// the only allowed value is "1", except allow-origin
+func parseEndpointOptions(rawQuery string) (endpointOptions, error) {
+	var options endpointOptions
+
+	query, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return options, err
+	}
+	if len(query) == 0 {
+		return options, fmt.Errorf("no options after \"?\"")
+	}
+
+	outputModes := map[string]outputMode{"stream": outputStream, "sse": outputSSE, "websocket": outputWebSocket}
+
+	for _, name := range slices.Sorted(maps.Keys(query)) {
+		mode, ok := outputModes[name]
+		if !ok && name != "allow-origin" {
+			return options, fmt.Errorf("unknown option %q, supported: stream, sse, websocket, allow-origin", name)
+		}
+
+		values := query[name]
+		if len(values) > 1 {
+			return options, fmt.Errorf("the option %q is set several times", name)
+		}
+
+		if name == "allow-origin" {
+			if err := checkAllowOrigin(values[0]); err != nil {
+				return options, fmt.Errorf("the option %q: %s", name, err)
+			}
+			options.allowOrigin = values[0]
+			continue
+		}
+
+		if values[0] != "1" {
+			return options, fmt.Errorf("the option %q must be set to 1, got %q", name, values[0])
+		}
+
+		if options.output != outputBuffered {
+			return options, fmt.Errorf("only one of the options stream, sse and websocket can be set")
+		}
+		options.output = mode
+	}
+
+	if options.allowOrigin != "" && options.output != outputWebSocket {
+		return options, fmt.Errorf("the option \"allow-origin\" can be used only with websocket=1")
+	}
+
+	return options, nil
 }
 
 // getShellAndParams - get default shell and command
@@ -167,16 +268,10 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 	reStatusCode := regexp.MustCompile(`^\d+`)
 
 	return func(rw http.ResponseWriter, req *http.Request) {
-		if appConfig.setForm && appConfig.maxUploadSize > 0 && isFormData(req.Header) {
-			req.Body = http.MaxBytesReader(rw, req.Body, appConfig.maxUploadSize)
-		}
+		limitFormBody(rw, req, appConfig)
 
 		shellOut, exitCode, err := execShellCommand(appConfig, shell, params, req, cacheTTL)
-		var formErr *formError
-		if errors.As(err, &formErr) {
-			// the command was not run, don't show internal details (like temp paths) to the client
-			log.Printf("read request body failed: %s", err)
-			http.Error(rw, http.StatusText(formErr.status), formErr.status)
+		if writeFormError(rw, err) {
 			return
 		}
 		if err != nil {
@@ -217,7 +312,7 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 			}
 		}
 
-		rw.Header().Set("X-Shell2http-Exit-Code", strconv.Itoa(exitCode))
+		rw.Header().Set(exitCodeHeader, strconv.Itoa(exitCode))
 
 		if customStatusCode > 0 {
 			rw.WriteHeader(customStatusCode)
@@ -227,6 +322,26 @@ func getShellHandler(appConfig Config, shell string, params []string, cacheTTL r
 
 		responseWrite(rw, outText)
 	}
+}
+
+// limitFormBody - limit the size of the request body parsed by -form (SH_MAX_UPLOAD_SIZE)
+func limitFormBody(rw http.ResponseWriter, req *http.Request, appConfig Config) {
+	if appConfig.setForm && appConfig.maxUploadSize > 0 && isFormData(req.Header) {
+		req.Body = http.MaxBytesReader(rw, req.Body, appConfig.maxUploadSize)
+	}
+}
+
+// writeFormError - if the command was not run because of the request body, send the error to the client
+func writeFormError(rw http.ResponseWriter, err error) bool {
+	var formErr *formError
+	if !errors.As(err, &formErr) {
+		return false
+	}
+
+	// don't show internal details (like temp paths) to the client
+	log.Printf("read request body failed: %s", err)
+	http.Error(rw, http.StatusText(formErr.status), formErr.status)
+	return true
 }
 
 // execShellCommand - execute shell command, returns bytes out and error
@@ -241,11 +356,59 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 	}
 
 	// the command is not bound to the request context: a client disconnect must not
-	// abort a script halfway, only -timeout limits the execution time
-	var osExecCommand *exec.Cmd
+	// abort a script halfway, only -timeout limits the execution time. Without -timeout
+	// the command is in the process group of shell2http and gets Ctrl-C from the terminal,
+	// with -timeout it is in its own process group and is killed on shutdown.
+	ctx := context.Background()
 	if appConfig.timeout > 0 {
-		ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(appConfig.timeout)*time.Second)
+		var cancelFn context.CancelFunc
+		ctx, cancelFn = context.WithTimeout(appConfig.commandContext(), time.Duration(appConfig.timeout)*time.Second)
 		defer cancelFn()
+	}
+
+	shellCmd, err := newShellCommand(ctx, appConfig, shell, params, req)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	stderr := io.Writer(&stderrBuf)
+	if appConfig.includeStderr {
+		stderr = &stdoutBuf
+	}
+
+	exitCode, err := shellCmd.run(&stdoutBuf, stderr)
+	if stderrBuf.Len() > 0 {
+		log.Printf("stderr: %s", stderrBuf.String())
+	}
+	shellOut := stdoutBuf.Bytes()
+
+	if appConfig.cache > 0 {
+		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
+			log.Printf("set to cache failed: %s", cacheErr)
+		}
+	}
+
+	return shellOut, exitCode, err
+}
+
+// shellCommand - a command prepared for the request, see newShellCommand
+type shellCommand struct {
+	cmd       *exec.Cmd
+	finalizer func()     // removes temporary files of the request
+	pipeErrCh chan error // result of writing the request body to the command stdin, nil if the body is not written
+
+	// called after the command has exited, if the request body is still being read (a stalled upload),
+	// to interrupt the reading, nil - wait for it as long as it takes (the buffered mode)
+	interruptInput func()
+}
+
+// newShellCommand - prepare the command for the request: environment, form variables and uploaded files,
+// CGI variables and the request body on stdin. If ctx can be canceled, the shell and all processes it started
+// are killed when ctx is done. On error the command must not be run.
+func newShellCommand(ctx context.Context, appConfig Config, shell string, params []string, req *http.Request) (*shellCommand, error) {
+	var osExecCommand *exec.Cmd
+	if ctx.Done() != nil {
 		osExecCommand = exec.CommandContext(ctx, shell, params...) // #nosec
 		setProcessGroup(osExecCommand)
 		// don't wait for processes that escaped the process group and still hold stdout/stderr
@@ -256,22 +419,15 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 
 	proxySystemEnv(osExecCommand, appConfig)
 
-	finalizer := func() {}
+	shellCmd := &shellCommand{cmd: osExecCommand, finalizer: func() {}}
 	if appConfig.setForm {
 		var err error
-		if finalizer, err = getForm(osExecCommand, req, appConfig.formCheckRe); err != nil {
+		if shellCmd.finalizer, err = getForm(osExecCommand, req, appConfig.formCheckRe); err != nil {
 			// fail closed: don't run the command with some of the form variables missing
-			finalizer()
-			return nil, 0, err
+			shellCmd.finalizer()
+			return nil, err
 		}
 	}
-
-	var (
-		waitPipeWrite bool
-		pipeErrCh     = make(chan error)
-		shellOut      []byte
-		err           error
-	)
 
 	if appConfig.setCGI {
 		// get request body data data to stdin of script (if not parse form vars above)
@@ -281,11 +437,11 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 			// a chunked body has no length, read it all to set CONTENT_LENGTH (RFC 3875 4.1.2)
 			removeSpool, spoolErr := spoolBody(req)
 			if spoolErr != nil {
-				finalizer()
-				return nil, 0, newFormParseError(spoolErr)
+				shellCmd.finalizer()
+				return nil, newFormParseError(spoolErr)
 			}
-			formFinalizer := finalizer
-			finalizer = func() {
+			formFinalizer := shellCmd.finalizer
+			shellCmd.finalizer = func() {
 				removeSpool()
 				formFinalizer()
 			}
@@ -297,7 +453,8 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 			if stdin, pipeErr := osExecCommand.StdinPipe(); pipeErr != nil {
 				log.Println("write request body data to shell failed:", pipeErr)
 			} else {
-				waitPipeWrite = true
+				pipeErrCh := make(chan error, 1)
+				shellCmd.pipeErrCh = pipeErrCh
 				go func() {
 					if _, pipeErr := io.Copy(stdin, req.Body); pipeErr != nil {
 						pipeErrCh <- pipeErr
@@ -309,16 +466,14 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		}
 	}
 
-	if appConfig.includeStderr {
-		shellOut, err = osExecCommand.CombinedOutput()
-	} else {
-		var stderrBuf bytes.Buffer
-		osExecCommand.Stderr = &stderrBuf
-		shellOut, err = osExecCommand.Output()
-		if stderrBuf.Len() > 0 {
-			log.Printf("stderr: %s", stderrBuf.String())
-		}
-	}
+	return shellCmd, nil
+}
+
+// run - run the command with the output to stdout and stderr (may be the same writer),
+// removes temporary files of the request, returns the exit code
+func (sc *shellCommand) run(stdout, stderr io.Writer) (int, error) {
+	sc.cmd.Stdout, sc.cmd.Stderr = stdout, stderr
+	err := sc.cmd.Run()
 
 	if errors.Is(err, exec.ErrWaitDelay) {
 		// the command exited successfully, but some background process kept its output open
@@ -326,26 +481,31 @@ func execShellCommand(appConfig Config, shell string, params []string, req *http
 		err = nil
 	}
 
-	if waitPipeWrite {
-		if pipeErr := <-pipeErrCh; pipeErr != nil {
+	if sc.pipeErrCh != nil {
+		var pipeErr error
+		select {
+		case pipeErr = <-sc.pipeErrCh:
+		default:
+			// the request body is still being read (eg: a stalled upload)
+			if sc.interruptInput != nil {
+				sc.interruptInput()
+			}
+			pipeErr = <-sc.pipeErrCh
+		}
+		if pipeErr != nil {
 			log.Println("write request body data to shell failed:", pipeErr)
 		}
 	}
 
-	finalizer()
+	sc.finalizer()
 
-	if appConfig.cache > 0 {
-		if cacheErr := cacheTTL.SetBytes(req.RequestURI, shellOut, appConfig.cache); cacheErr != nil {
-			log.Printf("set to cache failed: %s", cacheErr)
-		}
+	// -1 if the command was not started (eg: the shell is not found), the same as for a killed command
+	exitCode := -1
+	if sc.cmd.ProcessState != nil {
+		exitCode = sc.cmd.ProcessState.ExitCode()
 	}
 
-	exitCode := 0
-	if osExecCommand.ProcessState != nil {
-		exitCode = osExecCommand.ProcessState.ExitCode()
-	}
-
-	return shellOut, exitCode, err
+	return exitCode, err
 }
 
 // setupHandlers - setup http handlers
@@ -374,7 +534,17 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 		indexLiHTML = append(indexLiHTML, fmt.Sprintf(`<li><a href=".%s">%s%s</a> <span style="color: #888">- %s</span></li>`, html.EscapeString(path), methodDesc, html.EscapeString(path), html.EscapeString(cmd)))
 		cmdsForLog[path] = append(cmdsForLog[path], cmd)
 
-		handler := mwMethodOnly(getShellHandler(appConfig, shell, params, cacheTTL), row.httpMethod)
+		var shellHandler http.HandlerFunc
+		switch row.options.output {
+		case outputBuffered:
+			shellHandler = getShellHandler(appConfig, shell, params, cacheTTL)
+		case outputWebSocket:
+			shellHandler = getWebSocketHandler(appConfig, shell, params, row.options.allowOrigin)
+		default:
+			shellHandler = getStreamHandler(appConfig, shell, params, row.options.output)
+		}
+
+		handler := mwMethodOnly(shellHandler, row.httpMethod)
 		if _, ok := groupedCmd[path]; !ok {
 			groupedCmd[path] = map[string]http.HandlerFunc{}
 		}
@@ -894,6 +1064,11 @@ func main() {
 		cacheTTL = raphanus.New()
 	}
 
+	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), shutdownSignals...)
+	defer stopSignals()
+	appConfig.shutdownCtx = shutdownCtx
+	appConfig.hijacked = &sync.WaitGroup{}
+
 	cmdHandlers, err = setupHandlers(cmdHandlers, *appConfig, cacheTTL)
 	if err != nil {
 		log.Fatal(err)
@@ -928,9 +1103,41 @@ func main() {
 		server.ReadTimeout = time.Duration(appConfig.timeout) * time.Second
 	}
 
-	if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
-		log.Fatal(server.ServeTLS(listener, appConfig.cert, appConfig.key))
-	} else {
-		log.Fatal(server.Serve(listener))
+	serveErr := make(chan error, 1)
+	go func() {
+		if len(appConfig.cert) > 0 && len(appConfig.key) > 0 {
+			serveErr <- server.ServeTLS(listener, appConfig.cert, appConfig.key)
+		} else {
+			serveErr <- server.Serve(listener)
+		}
+	}()
+
+	select {
+	case err := <-serveErr:
+		log.Fatal(err)
+	case <-shutdownCtx.Done():
+	}
+
+	// a second Ctrl-C stops the server at once
+	stopSignals()
+	log.Printf("shutting down, running commands are stopped")
+
+	// running commands are killed by shutdownCtx, wait for their handlers to send the rest of the response
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("shutdown failed: %s", err)
+	}
+
+	// server.Shutdown doesn't wait for hijacked connections (websocket)
+	hijackedDone := make(chan struct{})
+	go func() {
+		appConfig.hijacked.Wait()
+		close(hijackedDone)
+	}()
+	select {
+	case <-hijackedDone:
+	case <-ctx.Done():
+		log.Printf("shutdown failed: websocket connections are not closed within %s", shutdownTimeout)
 	}
 }

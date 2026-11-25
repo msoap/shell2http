@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -131,6 +133,20 @@ func (rwl *responseWriterLogger) Write(data []byte) (int, error) {
 func (rwl *responseWriterLogger) WriteHeader(statusCode int) {
 	rwl.statusCode = statusCode
 	rwl.srcRW.WriteHeader(statusCode)
+}
+
+// Unwrap - get the original http.ResponseWriter, used by http.ResponseController (eg: Flush in the stream mode)
+func (rwl *responseWriterLogger) Unwrap() http.ResponseWriter {
+	return rwl.srcRW
+}
+
+// Hijack - take over the connection (the websocket mode), gorilla/websocket requires http.Hijacker, not Unwrap
+func (rwl *responseWriterLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, brw, err := http.NewResponseController(rwl.srcRW).Hijack()
+	if err == nil {
+		rwl.statusCode = http.StatusSwitchingProtocols
+	}
+	return conn, brw, err
 }
 
 func (rwl *responseWriterLogger) StatusCode() int {

@@ -532,6 +532,121 @@ func Test_parsePathAndCommands(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "stream and sse options",
+			args: []string{"/live?stream=1", "tail -F log", "GET:/events?sse=1", "tail -F log"},
+			want: []command{
+				{path: "/live", cmd: "tail -F log", options: endpointOptions{output: outputStream}},
+				{path: "/events", cmd: "tail -F log", httpMethod: "GET", options: endpointOptions{output: outputSSE}},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "option without value",
+			args:    []string{"/live?sse", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "option with 0",
+			args:    []string{"/live?stream=0", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "option with true",
+			args:    []string{"/live?stream=true", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "empty options",
+			args:    []string{"/live?", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "the same path with and without options",
+			args:    []string{"/live?stream=1", "tail -F log", "/live", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "the same path with options for different methods",
+			args:    []string{"GET:/live?sse=1", "tail -F log", "POST:/live", "date"},
+			want:    []command{{path: "/live", cmd: "tail -F log", httpMethod: "GET", options: endpointOptions{output: outputSSE}}, {path: "/live", cmd: "date", httpMethod: "POST"}},
+			wantErr: false,
+		},
+		{
+			name:    "unknown option",
+			args:    []string{"/live?foo=1", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid option value",
+			args:    []string{"/live?stream=yes", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "repeated option",
+			args:    []string{"/live?stream=1&stream=1", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "stream and sse together",
+			args:    []string{"/live?stream=1&sse=1", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "websocket options",
+			args: []string{
+				"/ws?websocket=1", "cat",
+				"GET:/ws2?websocket=1&allow-origin=same-site", "cat",
+				"/ws3?allow-origin=*&websocket=1", "cat",
+				"/ws4?websocket=1&allow-origin=https://app.example.com,http://localhost:3000", "cat",
+			},
+			want: []command{
+				{path: "/ws", cmd: "cat", options: endpointOptions{output: outputWebSocket}},
+				{path: "/ws2", cmd: "cat", httpMethod: "GET", options: endpointOptions{output: outputWebSocket, allowOrigin: "same-site"}},
+				{path: "/ws3", cmd: "cat", options: endpointOptions{output: outputWebSocket, allowOrigin: "*"}},
+				{path: "/ws4", cmd: "cat", options: endpointOptions{output: outputWebSocket, allowOrigin: "https://app.example.com,http://localhost:3000"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "websocket with POST method",
+			args:    []string{"POST:/ws?websocket=1", "cat"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "websocket and sse together",
+			args:    []string{"/ws?websocket=1&sse=1", "cat"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "allow-origin without websocket",
+			args:    []string{"/live?sse=1&allow-origin=*", "date"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid allow-origin",
+			args:    []string{"/ws?websocket=1&allow-origin=example.com", "cat"},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "repeated allow-origin",
+			args:    []string{"/ws?websocket=1&allow-origin=*&allow-origin=same-site", "cat"},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

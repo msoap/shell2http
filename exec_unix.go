@@ -9,6 +9,9 @@ import (
 	"syscall"
 )
 
+// shutdownSignals - signals for shutdown of the server, running commands in own process groups are killed
+var shutdownSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
+
 // setProcessGroup - run the command in its own process group, and kill the whole group
 // (the shell and everything it started) when the command context is done
 func setProcessGroup(cmd *exec.Cmd) {
