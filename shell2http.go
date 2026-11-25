@@ -86,10 +86,10 @@ const (
 type outputMode int
 
 const (
-	outputBuffered outputMode = iota // wait for the command to finish, then send the whole output (default)
-	outputStream                     // stream=1: send the output as it is written
-	outputSSE                        // sse=1: send each line of the output as a Server-Sent Event
-	outputWebSocket                  // websocket=1: messages from the client to stdin, each line of the output as a message
+	outputBuffered  outputMode = iota // wait for the command to finish, then send the whole output (default)
+	outputStream                      // stream=1: send the output as it is written
+	outputSSE                         // sse=1: send each line of the output as a Server-Sent Event
+	outputWebSocket                   // websocket=1: messages from the client to stdin, each line of the output as a message
 )
 
 // allowOrigin* - special values of the allow-origin option, any other value is a list of origins
