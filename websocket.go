@@ -20,8 +20,14 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// maxMessageSize - max size of a WebSocket message from the client, a bigger message closes the connection
-const maxMessageSize = maxLineSize
+const (
+	// maxMessageSize - max size of a WebSocket message from the client, a bigger message closes the connection
+	maxMessageSize = maxLineSize
+
+	// stdinQueueSize - how many messages from the client may wait for the command to read stdin
+	// (in addition to the pipe buffer), when the queue is full the command is stopped
+	stdinQueueSize = 64
+)
 
 // getWebSocketHandler - get handler function for a command connected to the client by WebSocket (endpoint option websocket=1):
 // each message from the client is written to stdin with "\n" appended, each line of the output is sent as a message,
@@ -42,6 +48,11 @@ func getWebSocketHandler(appConfig Config, shell string, params []string, allowO
 		}
 		if !websocket.IsWebSocketUpgrade(req) {
 			http.Error(rw, "WebSocket handshake expected", http.StatusBadRequest)
+			return
+		}
+		// a handshake has no body, and with -form a body (eg: multipart uploads) would be parsed before the upgrade
+		if req.ContentLength != 0 {
+			http.Error(rw, "WebSocket handshake must not have a body", http.StatusBadRequest)
 			return
 		}
 		if !upgrader.CheckOrigin(req) {
@@ -106,11 +117,27 @@ func getWebSocketHandler(appConfig Config, shell string, params []string, allowO
 		// the client has closed the connection or doesn't accept the output
 		var clientGone atomic.Bool
 
+		// messages to stdin are written by a worker, so the reader is not blocked by a command that doesn't read stdin
+		// and still sees the client closing the connection; a blocked write is interrupted when the command is killed
+		stdinQueue := make(chan []byte, stdinQueueSize)
+		stopCloseStdin := context.AfterFunc(ctx, func() { _ = stdin.Close() })
+		defer stopCloseStdin()
+		go func() {
+			var writeErr error
+			for message := range stdinQueue {
+				// the command has exited or closed stdin: the rest of the input is discarded
+				if writeErr == nil {
+					_, writeErr = stdin.Write(message)
+				}
+			}
+		}()
+
 		// messages from the client to stdin, until the client has closed the connection
 		readerDone := make(chan struct{})
 		go func() {
 			defer close(readerDone)
-			writeStdin := true
+			defer close(stdinQueue)
+			queueing := true
 			for {
 				_, message, err := conn.ReadMessage()
 				if err != nil {
@@ -119,10 +146,16 @@ func getWebSocketHandler(appConfig Config, shell string, params []string, allowO
 					}
 					break
 				}
-				if writeStdin {
-					// the command has exited or closed stdin: the rest of the input is discarded
-					_, err = stdin.Write(append(message, '\n'))
-					writeStdin = err == nil
+				if !queueing {
+					continue
+				}
+				select {
+				case stdinQueue <- append(message, '\n'):
+				default:
+					// the command doesn't read stdin, the input can't be buffered without a limit
+					log.Printf("websocket: the command doesn't read stdin, more than %d messages are waiting, the command is stopped", stdinQueueSize)
+					queueing = false
+					cancelFn()
 				}
 			}
 			clientGone.Store(true)

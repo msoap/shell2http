@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -28,7 +30,11 @@ func newWebSocketServer(t *testing.T, appConfig Config, cmd string, allowOrigin 
 	handler := mwLogging(getWebSocketHandler(appConfig, shell, params, allowOrigin)) // hijack must work through the middleware
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		handler(rw, req)
-		handlerDone <- struct{}{}
+		// don't block a test that makes several requests and doesn't wait for the handlers
+		select {
+		case handlerDone <- struct{}{}:
+		default:
+		}
 	}))
 	t.Cleanup(server.Close)
 
@@ -191,7 +197,7 @@ func Test_getWebSocketHandler_inputAfterExit(t *testing.T) {
 
 func Test_getWebSocketHandler_clientDisconnectKillsProcessGroup(t *testing.T) {
 	for _, withCloseFrame := range []bool{false, true} {
-		server, handlerDone := newWebSocketServer(t, testConfig(0), "sleep 30 & echo $!; wait", "")
+		server, handlerDone := newWebSocketServer(t, testConfig(0), "sleep 10 & echo $!; wait", "")
 		conn := dialWebSocket(t, server)
 		pid := readPid(t, conn)
 
@@ -212,12 +218,61 @@ func Test_getWebSocketHandler_clientDisconnectKillsProcessGroup(t *testing.T) {
 	}
 }
 
+// sendBigMessages - send messages that the command doesn't read, the pipe buffer of stdin is 64KB
+func sendBigMessages(t *testing.T, conn *websocket.Conn, count int) {
+	t.Helper()
+
+	message := []byte(strings.Repeat("x", 60*1024))
+	for range count {
+		if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			break // the server has closed the connection
+		}
+	}
+}
+
+func Test_getWebSocketHandler_clientDisconnectWithFullStdin(t *testing.T) {
+	server, handlerDone := newWebSocketServer(t, testConfig(0), "sleep 10 & echo $!; wait", "")
+	conn := dialWebSocket(t, server)
+	pid := readPid(t, conn)
+
+	// more than the pipe buffer, but less than the queue: the command keeps running
+	sendBigMessages(t, conn, 10)
+	closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	if err := conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	waitHandlerDone(t, handlerDone, "after client disconnect with a full stdin")
+	if !waitProcessGone(pid) {
+		t.Errorf("child process %d is still running after client disconnect", pid)
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+	}
+}
+
+func Test_getWebSocketHandler_stdinQueueOverflow(t *testing.T) {
+	server, handlerDone := newWebSocketServer(t, testConfig(0), "sleep 10 & echo $!; wait", "")
+	conn := dialWebSocket(t, server)
+	pid := readPid(t, conn)
+
+	sendBigMessages(t, conn, stdinQueueSize+20)
+
+	_, closeErr := readUntilClose(t, conn, 3*time.Second)
+	if closeErr.Text != "-1" {
+		t.Errorf("exit code: got %q, want -1 (killed)", closeErr.Text)
+	}
+	waitHandlerDone(t, handlerDone, "on stdin queue overflow")
+	if !waitProcessGone(pid) {
+		t.Errorf("child process %d is still running after stdin queue overflow", pid)
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+	}
+}
+
 func Test_getWebSocketHandler_shutdownKillsCommand(t *testing.T) {
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
 	appConfig := testConfig(0)
 	appConfig.shutdownCtx = shutdownCtx
-	server, handlerDone := newWebSocketServer(t, appConfig, "sleep 30 & echo $!; wait", "")
+	server, handlerDone := newWebSocketServer(t, appConfig, "sleep 10 & echo $!; wait", "")
 	conn := dialWebSocket(t, server)
 	pid := readPid(t, conn)
 
@@ -236,7 +291,8 @@ func Test_getWebSocketHandler_shutdownKillsCommand(t *testing.T) {
 }
 
 func Test_getWebSocketHandler_timeout(t *testing.T) {
-	server, _ := newWebSocketServer(t, testConfig(1), "echo started; sleep 30", "")
+	t.Parallel()
+	server, _ := newWebSocketServer(t, testConfig(1), "echo started; sleep 10", "")
 	conn := dialWebSocket(t, server)
 
 	start := time.Now()
@@ -250,6 +306,7 @@ func Test_getWebSocketHandler_timeout(t *testing.T) {
 }
 
 func Test_getWebSocketHandler_stalledReaderIsClosedOnTimeout(t *testing.T) {
+	t.Parallel()
 	server, handlerDone := newWebSocketServer(t, testConfig(1), "yes", "")
 	// the client doesn't read the output
 	_ = dialWebSocket(t, server)
@@ -262,31 +319,52 @@ func Test_getWebSocketHandler_stalledReaderIsClosedOnTimeout(t *testing.T) {
 }
 
 func Test_getWebSocketHandler_handshake(t *testing.T) {
-	server, _ := newWebSocketServer(t, testConfig(0), "echo should not run", "")
+	appConfig := testConfig(0)
+	appConfig.setForm = true
+	appConfig.maxUploadSize = 10
+	server, _ := newWebSocketServer(t, appConfig, "echo should not run", "")
+
+	handshake := func(extra http.Header) http.Header {
+		header := http.Header{
+			"Connection": {"Upgrade"}, "Upgrade": {"websocket"},
+			"Sec-Websocket-Version": {"13"}, "Sec-Websocket-Key": {"dGhlIHNhbXBsZSBub25jZQ=="},
+		}
+		maps.Copy(header, extra)
+		return header
+	}
 
 	tests := []struct {
 		name       string
 		method     string
 		header     http.Header
+		body       string
 		wantStatus int
 	}{
+		{
+			// with -form the body would be parsed before the upgrade, bypassing SH_MAX_UPLOAD_SIZE
+			name:       "handshake with a body",
+			method:     "GET",
+			header:     handshake(http.Header{"Content-Type": {"application/x-www-form-urlencoded"}}),
+			body:       "a=" + strings.Repeat("x", 100),
+			wantStatus: http.StatusBadRequest,
+		},
 		{name: "not a websocket", method: "GET", wantStatus: http.StatusBadRequest},
 		{name: "POST", method: "POST", wantStatus: http.StatusMethodNotAllowed},
 		{
-			name:   "cross-origin",
-			method: "GET",
-			header: http.Header{
-				"Connection": {"Upgrade"}, "Upgrade": {"websocket"},
-				"Sec-Websocket-Version": {"13"}, "Sec-Websocket-Key": {"dGhlIHNhbXBsZSBub25jZQ=="},
-				"Origin": {"http://evil.example.com"},
-			},
+			name:       "cross-origin",
+			method:     "GET",
+			header:     handshake(http.Header{"Origin": {"http://evil.example.com"}}),
 			wantStatus: http.StatusForbidden,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest(tt.method, server.URL, nil)
+			var body io.Reader
+			if tt.body != "" {
+				body = strings.NewReader(tt.body)
+			}
+			req, err := http.NewRequest(tt.method, server.URL, body)
 			if err != nil {
 				t.Fatal(err)
 			}

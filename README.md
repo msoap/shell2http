@@ -451,14 +451,16 @@ With the `websocket=1` [endpoint option](#endpoint-options) the command is start
 (`new WebSocket("ws://host:8080/path")` in a browser), and works while the connection is open:
 
   * each message from the client (text or binary) is written to STDIN of the command with `\n` appended,
-    so `read line` in a script gets one message; a message bigger than 64KB closes the connection
+    so `read line` in a script gets one message; a message bigger than 64KB closes the connection.
+    If the command doesn't read STDIN, and more than 64 messages are waiting (in addition to the 64KB pipe buffer),
+    the command is stopped
   * each line of stdout is sent as a message (without `\n`, `\r\n`), a line longer than 64KB is split into several messages,
     a line that is not valid UTF-8 is sent as a binary message. With `-include-stderr` the stderr lines are sent too
   * when the command has finished, the connection is closed with the code `1000` and the exit code as the reason
     (`event.reason` in `onclose`), `-1` for a killed command
   * the command (the shell and all processes it started) is killed when the client closes the connection,
     on `-timeout` or on shutdown of shell2http, like for [streaming endpoints](#live-output-stream-and-sse)
-  * the path accepts only WebSocket handshakes (`GET`), a plain request gets `400`
+  * the path accepts only WebSocket handshakes (`GET` without a body), a plain request gets `400`
   * `-form`, `-cgi` (variables only, there is no request body) and `-basic-auth` work as usual,
     the options not working for streaming endpoints don't work here either
 

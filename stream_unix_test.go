@@ -39,6 +39,7 @@ func newStreamServer(t *testing.T, appConfig Config, cmd string, mode outputMode
 }
 
 func Test_getStreamHandler_outputBeforeExit(t *testing.T) {
+	t.Parallel()
 	server, _ := newStreamServer(t, testConfig(0), "echo first; sleep 1; echo second; exit 3", outputStream)
 
 	start := time.Now()
@@ -123,7 +124,7 @@ func Test_getStreamHandler_SSE(t *testing.T) {
 
 func Test_getStreamHandler_clientDisconnectKillsProcessGroup(t *testing.T) {
 	for _, mode := range []outputMode{outputStream, outputSSE} {
-		server, handlerDone := newStreamServer(t, testConfig(0), "sleep 30 & echo $!; wait", mode)
+		server, handlerDone := newStreamServer(t, testConfig(0), "sleep 10 & echo $!; wait", mode)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		req, err := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
@@ -176,7 +177,7 @@ func Test_getStreamHandler_shutdownKillsCommand(t *testing.T) {
 	defer shutdown()
 	appConfig := testConfig(0)
 	appConfig.shutdownCtx = shutdownCtx
-	server, handlerDone := newStreamServer(t, appConfig, "sleep 30 & echo $!; wait", outputStream)
+	server, handlerDone := newStreamServer(t, appConfig, "sleep 10 & echo $!; wait", outputStream)
 
 	res, err := http.Get(server.URL)
 	if err != nil {
@@ -218,7 +219,7 @@ func Test_execShellCommand_shutdownKillsCommandWithTimeout(t *testing.T) {
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	appConfig := testConfig(10)
 	appConfig.shutdownCtx = shutdownCtx
-	shell, params, err := getShellAndParams("sleep 30; echo done", appConfig)
+	shell, params, err := getShellAndParams("sleep 10; echo done", appConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,6 +275,7 @@ func dialStalled(t *testing.T, server *httptest.Server, rawRequest string) net.C
 }
 
 func Test_getStreamHandler_stalledUpload(t *testing.T) {
+	t.Parallel()
 	appConfig := testConfig(0)
 	appConfig.setCGI = true
 	server, handlerDone := newStreamServer(t, appConfig, "echo started", outputStream)
@@ -299,6 +301,7 @@ func Test_getStreamHandler_stalledUpload(t *testing.T) {
 }
 
 func Test_getStreamHandler_stalledReaderTimeout(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []outputMode{outputStream, outputSSE} {
 		server, handlerDone := newStreamServer(t, testConfig(1), "yes", mode)
 
@@ -322,7 +325,8 @@ func Test_shellCommand_launchFailureExitCode(t *testing.T) {
 }
 
 func Test_getStreamHandler_timeout(t *testing.T) {
-	server, _ := newStreamServer(t, testConfig(1), "echo started; sleep 30", outputStream)
+	t.Parallel()
+	server, _ := newStreamServer(t, testConfig(1), "echo started; sleep 10", outputStream)
 
 	start := time.Now()
 	res, err := http.Get(server.URL)

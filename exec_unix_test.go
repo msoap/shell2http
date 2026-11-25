@@ -95,6 +95,7 @@ func Test_getShellHandler_CGIPathAndServer(t *testing.T) {
 }
 
 func Test_getShellHandler_CGIResponseHeaders(t *testing.T) {
+	t.Parallel()
 	data := []struct {
 		name       string
 		cmd        string
@@ -179,6 +180,7 @@ func Test_getShellHandler_CGIResponseHeaders(t *testing.T) {
 }
 
 func Test_execShellCommand_timeoutKillsProcessGroup(t *testing.T) {
+	t.Parallel()
 	appConfig := testConfig(1)
 	shell, params, err := getShellAndParams("sleep 5; echo done", appConfig)
 	if err != nil {
@@ -201,6 +203,7 @@ func Test_execShellCommand_timeoutKillsProcessGroup(t *testing.T) {
 }
 
 func Test_execShellCommand_timeoutBackgroundHoldsOutput(t *testing.T) {
+	t.Parallel()
 	appConfig := testConfig(10)
 	shell, params, err := getShellAndParams("sleep 5 & echo started", appConfig)
 	if err != nil {
@@ -220,6 +223,7 @@ func Test_execShellCommand_timeoutBackgroundHoldsOutput(t *testing.T) {
 }
 
 func Test_execShellCommand_detachedProcessSurvives(t *testing.T) {
+	t.Parallel()
 	for _, timeout := range []int{0, 1} {
 		appConfig := testConfig(timeout)
 		shell, params, err := getShellAndParams("sleep 5 >/dev/null 2>&1 & echo $!", appConfig)
@@ -250,6 +254,7 @@ func Test_execShellCommand_detachedProcessSurvives(t *testing.T) {
 }
 
 func Test_execShellCommand_clientDisconnect(t *testing.T) {
+	t.Parallel()
 	for _, timeout := range []int{0, 5} {
 		appConfig := testConfig(timeout)
 		finished := filepath.Join(t.TempDir(), "finished")
