@@ -63,14 +63,19 @@ The SH_MAX_UPLOAD_SIZE environment variable limits the size (in bytes) of a requ
 You can specify the preferred HTTP-method (via "METHOD:" prefix for path): shell2http GET:/date date
 
 Endpoint options are set as a query string in the path argument: "[METHOD:]/path[?option=1&...]",
-the only allowed value is "1":
+the only allowed value is "1" (except allow-origin):
 
   - stream=1 -- send the command output as it is written, without waiting for the command to finish
   - sse=1 -- the same, but each line of the output is sent as a Server-Sent Event, and an "exit" event at the end
+  - websocket=1 -- connect the command by WebSocket: each message from the client is written to stdin with "\n" appended,
+    each line of the output is sent as a message, the connection is closed with the exit code as the close reason
+  - allow-origin=... -- the web pages allowed to open the WebSocket (by the Origin header): same-origin (default),
+    same-site, * (any) or a comma-separated list of origins (https://a.com,http://localhost:3000)
 
-For streaming endpoints the command is killed when the client disconnects or on Ctrl-C/SIGTERM. Example:
+For streaming and WebSocket endpoints the command is killed when the client disconnects or on Ctrl-C/SIGTERM. Example:
 
 	shell2http "/live?stream=1" "tail -F some.log" "/events?sse=1" "tail -F some.log"
+	shell2http "/ws?websocket=1&allow-origin=same-site" 'while read line; do echo "got: $line"; done'
 
 Examples:
 

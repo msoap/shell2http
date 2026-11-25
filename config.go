@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type authUsers struct {
@@ -72,6 +73,7 @@ type Config struct {
 	formCheckRe   *regexp.Regexp  // regexp for check form fields
 	maxUploadSize int64           // max size of request body parsed by -form (in bytes), 0 - no limit
 	shutdownCtx   context.Context // canceled on SIGINT/SIGTERM, nil - never
+	hijacked      *sync.WaitGroup // running handlers of hijacked connections (websocket), server.Shutdown doesn't wait for them, nil - not tracked
 }
 
 // commandContext - parent context for commands that must be killed when the server is shutting down

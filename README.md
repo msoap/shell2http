@@ -84,21 +84,24 @@ Some settings are set per endpoint, as a query string in the path argument (it i
 
     shell2http "/live?stream=1" "tail -F some.log"
     shell2http "GET:/events?sse=1" "tail -F some.log"
+    shell2http "/ws?websocket=1&allow-origin=same-site" 'while read line; do echo "got: $line"; done'
 
-| Option     | Description |
-|------------|-------------|
-| `stream=1` | send the command output to the client as it is written, without waiting for the command to finish |
-| `sse=1`    | the same as `stream`, but each line of the output is sent as a [Server-Sent Event](https://html.spec.whatwg.org/multipage/server-sent-events.html) |
+| Option           | Description |
+|------------------|-------------|
+| `stream=1`       | send the command output to the client as it is written, without waiting for the command to finish |
+| `sse=1`          | the same as `stream`, but each line of the output is sent as a [Server-Sent Event](https://html.spec.whatwg.org/multipage/server-sent-events.html) |
+| `websocket=1`    | connect the command to the client by [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket): messages from the client are written to STDIN, each line of the output is sent as a message |
+| `allow-origin=…` | the web pages allowed to open the WebSocket (only with `websocket=1`): `same-origin` (default), `same-site`, `*` or a comma-separated list of origins |
 
-  * the only allowed value is `1`, to disable an option just don't set it
-  * an unknown option, a value other than `1` (`/path?sse`, `/path?sse=true`), an empty `?`
-    or `stream` together with `sse` is an error on start
+  * the only allowed value is `1` (except `allow-origin`), to disable an option just don't set it
+  * an unknown option, a value other than `1` (`/path?sse`, `/path?sse=true`), an empty `?`,
+    more than one of `stream`, `sse` and `websocket`, or a `websocket` path with a method other than `GET` is an error on start
   * the options are not a part of the path, so `/live?stream=1` and `/live` are the same path (a duplicate),
     the path still can have different commands for different methods (`GET:/live?sse=1` and `POST:/live`)
   * without options an endpoint works as usual: the output is sent after the command has finished
 
-Remember to quote the path argument, `?` and `&` are special characters for the shell.
-See [Live output](#live-output-stream-and-sse) for details.
+Remember to quote the path argument, `?`, `&` and `*` are special characters for the shell.
+See [Live output](#live-output-stream-and-sse) and [WebSocket](#websocket) for details.
 
 Install
 -------
@@ -203,6 +206,26 @@ const events = new EventSource("/events");
 events.onmessage = (e) => console.log(e.data);
 events.addEventListener("exit", (e) => { console.log("exit code:", e.data); events.close(); });
 ```
+</details>
+
+<details><summary>Interactive command in a browser (WebSocket)</summary>
+
+```sh
+shell2http "/ws?websocket=1" 'while read -r line; do echo "$line" | rev; done'
+```
+
+Open `http://localhost:8080/` and run in the browser console:
+
+```js
+const ws = new WebSocket(`ws://${location.host}/ws`);
+ws.onmessage = (e) => console.log(e.data);
+ws.onclose = (e) => console.log("exit code:", e.reason);
+ws.onopen = () => ws.send("hello"); // prints "olleh"
+```
+
+Or from the command line, eg with [websocat](https://github.com/vi/websocat): `websocat ws://localhost:8080/ws`
+
+A page with all live output modes (stream, SSE and WebSocket): [examples/stream](examples/stream)
 </details>
 
 <details><summary>Run command in background (don't wait for it to finish)</summary>
@@ -421,6 +444,35 @@ Many programs buffer their output when it is not a terminal, so it comes in big 
 
 A reverse proxy may buffer the response too: shell2http sends the `X-Accel-Buffering: no` header for nginx,
 for other proxies disable buffering for streaming paths in their settings.
+
+### WebSocket
+
+With the `websocket=1` [endpoint option](#endpoint-options) the command is started when a client opens a WebSocket
+(`new WebSocket("ws://host:8080/path")` in a browser), and works while the connection is open:
+
+  * each message from the client (text or binary) is written to STDIN of the command with `\n` appended,
+    so `read line` in a script gets one message; a message bigger than 64KB closes the connection
+  * each line of stdout is sent as a message (without `\n`, `\r\n`), a line longer than 64KB is split into several messages,
+    a line that is not valid UTF-8 is sent as a binary message. With `-include-stderr` the stderr lines are sent too
+  * when the command has finished, the connection is closed with the code `1000` and the exit code as the reason
+    (`event.reason` in `onclose`), `-1` for a killed command
+  * the command (the shell and all processes it started) is killed when the client closes the connection,
+    on `-timeout` or on shutdown of shell2http, like for [streaming endpoints](#live-output-stream-and-sse)
+  * the path accepts only WebSocket handshakes (`GET`), a plain request gets `400`
+  * `-form`, `-cgi` (variables only, there is no request body) and `-basic-auth` work as usual,
+    the options not working for streaming endpoints don't work here either
+
+A browser connects a WebSocket from any web page, with the cookies and saved basic auth credentials of the site,
+so the `Origin` of a page is checked with the `allow-origin` option (a page that is not allowed gets `403`):
+
+  * `same-origin` (default) - the host and port of `Origin` are the same as in the `Host` header
+    (`http://localhost:8080` for `localhost:8080`)
+  * `same-site` - the same registrable domain, any port and subdomain (`https://app.example.com` for `api.example.com`)
+  * `*` - any page, use it only for a command that is safe to run by anyone
+  * `https://a.com,http://localhost:3000` - only these origins (scheme, host and port as the browser sends them)
+
+A request without `Origin` (not from a browser: `websocat`, scripts) is always allowed.
+Behind a reverse proxy the `Host` header must be passed to shell2http as is, or use a list of origins.
 
 ### Shutdown
 

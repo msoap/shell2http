@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<title>shell2http live output</title>
+<p><a href="/stream">/stream</a> <button onclick="sse()">/sse</button>
+<form onsubmit="ws.send(msg.value); msg.value = ''; return false">
+  <input id="msg" placeholder="message to /ws"> <button>send</button>
+</form>
+<pre id="out"></pre>
+<script>
+const log = (s) => out.textContent += s + "\n";
+
+function sse() {
+  const events = new EventSource("/sse");
+  events.onmessage = (e) => log("sse: " + e.data);
+  // close it, otherwise EventSource reconnects and runs the command again
+  events.addEventListener("exit", (e) => { log("sse exit code: " + e.data); events.close(); });
+}
+
+const ws = new WebSocket("ws" + location.origin.slice(4) + "/ws"); // ws:// or wss://
+ws.onmessage = (e) => log("ws: " + e.data);
+ws.onclose = (e) => log("ws exit code: " + e.reason);
+</script>

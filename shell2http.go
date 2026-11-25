@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mattn/go-shellwords"
@@ -88,11 +89,20 @@ const (
 	outputBuffered outputMode = iota // wait for the command to finish, then send the whole output (default)
 	outputStream                     // stream=1: send the output as it is written
 	outputSSE                        // sse=1: send each line of the output as a Server-Sent Event
+	outputWebSocket                  // websocket=1: messages from the client to stdin, each line of the output as a message
+)
+
+// allowOrigin* - special values of the allow-origin option, any other value is a list of origins
+const (
+	allowOriginSameOrigin = "same-origin" // the Origin host is the same as the Host header (default)
+	allowOriginSameSite   = "same-site"   // the Origin host has the same registrable domain as the Host header
+	allowOriginAll        = "*"           // any origin
 )
 
 // endpointOptions - settings of one endpoint, set as a query in the path: "/path?stream=1"
 type endpointOptions struct {
-	output outputMode
+	output      outputMode
+	allowOrigin string // allow-origin: the origins allowed to open a WebSocket, "" - same-origin
 }
 
 // indexTmpl - template for index page
@@ -161,6 +171,11 @@ func parsePathAndCommands(args []string) ([]command, error) {
 			}
 		}
 
+		// the WebSocket handshake is always a GET request
+		if options.output == outputWebSocket && pathParts[1] != "" && pathParts[1] != http.MethodGet {
+			return nil, fmt.Errorf("the path %q has invalid options: websocket works only with the GET method", rawPath)
+		}
+
 		// the same path with different options is a duplicate too
 		pathKey := pathParts[1] + ":" + path
 		if uniqPaths[pathKey] {
@@ -175,7 +190,7 @@ func parsePathAndCommands(args []string) ([]command, error) {
 }
 
 // parseEndpointOptions - parse the endpoint options from the query part of the path ("stream=1&..."),
-// the only allowed value is "1"
+// the only allowed value is "1", except allow-origin
 func parseEndpointOptions(rawQuery string) (endpointOptions, error) {
 	var options endpointOptions
 
@@ -187,12 +202,12 @@ func parseEndpointOptions(rawQuery string) (endpointOptions, error) {
 		return options, fmt.Errorf("no options after \"?\"")
 	}
 
-	outputModes := map[string]outputMode{"stream": outputStream, "sse": outputSSE}
+	outputModes := map[string]outputMode{"stream": outputStream, "sse": outputSSE, "websocket": outputWebSocket}
 
 	for _, name := range slices.Sorted(maps.Keys(query)) {
 		mode, ok := outputModes[name]
-		if !ok {
-			return options, fmt.Errorf("unknown option %q, supported: stream, sse", name)
+		if !ok && name != "allow-origin" {
+			return options, fmt.Errorf("unknown option %q, supported: stream, sse, websocket, allow-origin", name)
 		}
 
 		values := query[name]
@@ -200,14 +215,26 @@ func parseEndpointOptions(rawQuery string) (endpointOptions, error) {
 			return options, fmt.Errorf("the option %q is set several times", name)
 		}
 
+		if name == "allow-origin" {
+			if err := checkAllowOrigin(values[0]); err != nil {
+				return options, fmt.Errorf("the option %q: %s", name, err)
+			}
+			options.allowOrigin = values[0]
+			continue
+		}
+
 		if values[0] != "1" {
 			return options, fmt.Errorf("the option %q must be set to 1, got %q", name, values[0])
 		}
 
 		if options.output != outputBuffered {
-			return options, fmt.Errorf("the options stream and sse can't be used together")
+			return options, fmt.Errorf("only one of the options stream, sse and websocket can be set")
 		}
 		options.output = mode
+	}
+
+	if options.allowOrigin != "" && options.output != outputWebSocket {
+		return options, fmt.Errorf("the option \"allow-origin\" can be used only with websocket=1")
 	}
 
 	return options, nil
@@ -508,9 +535,12 @@ func setupHandlers(cmdHandlers []command, appConfig Config, cacheTTL raphanus.DB
 		cmdsForLog[path] = append(cmdsForLog[path], cmd)
 
 		var shellHandler http.HandlerFunc
-		if row.options.output == outputBuffered {
+		switch row.options.output {
+		case outputBuffered:
 			shellHandler = getShellHandler(appConfig, shell, params, cacheTTL)
-		} else {
+		case outputWebSocket:
+			shellHandler = getWebSocketHandler(appConfig, shell, params, row.options.allowOrigin)
+		default:
 			shellHandler = getStreamHandler(appConfig, shell, params, row.options.output)
 		}
 
@@ -1037,6 +1067,7 @@ func main() {
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer stopSignals()
 	appConfig.shutdownCtx = shutdownCtx
+	appConfig.hijacked = &sync.WaitGroup{}
 
 	cmdHandlers, err = setupHandlers(cmdHandlers, *appConfig, cacheTTL)
 	if err != nil {
@@ -1096,5 +1127,17 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown failed: %s", err)
+	}
+
+	// server.Shutdown doesn't wait for hijacked connections (websocket)
+	hijackedDone := make(chan struct{})
+	go func() {
+		appConfig.hijacked.Wait()
+		close(hijackedDone)
+	}()
+	select {
+	case <-hijackedDone:
+	case <-ctx.Done():
+		log.Printf("shutdown failed: websocket connections are not closed within %s", shutdownTimeout)
 	}
 }
